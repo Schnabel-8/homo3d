@@ -11,14 +11,14 @@ namespace homo {
 
 	class MMAOptimizer {
 	public :
-		int n, m;
+		int n, m, q;
 		double a0;
 		double a, c, d;
 		~MMAOptimizer(void);
 		std::unique_ptr<MMAContext> context;
 		MMAOptimizer(int nconstrain, int nvar,
-			double a0_, double a_, double c_, double d_)
-			: a0(a0_), a(a_), c(c_), d(d_), n(nvar), m(nconstrain) {
+			double a0_, double a_, double c_, double d_ ,int q_)
+			: a0(a0_), a(a_), c(c_), d(d_), n(nvar), m(nconstrain),q(q_) {
 			init();
 		}
 
