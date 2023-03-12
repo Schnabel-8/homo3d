@@ -17,7 +17,7 @@ namespace homo {
 		~MMAOptimizer(void);
 		std::unique_ptr<MMAContext> context;
 		MMAOptimizer(int nconstrain, int nvar,
-			double a0_, double a_, double c_, double d_ ,int q_)
+			double a0_, double a_, double c_, double d_ ,int q_=0)
 			: a0(a0_), a(a_), c(c_), d(d_), n(nvar), m(nconstrain),q(q_) {
 			init();
 		}
