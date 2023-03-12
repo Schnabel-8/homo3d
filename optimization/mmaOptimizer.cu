@@ -35,7 +35,7 @@ namespace homo {
 			acdhost[i + 2 * m] = d;
 		}
 		for (int i=0;i<q;++i){
-		acdhost[q] = 0;
+		acdhost[i] = 0;
 		}
 		context->acd.set(acdhost.data());
 
