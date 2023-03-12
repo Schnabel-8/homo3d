@@ -33,7 +33,7 @@ __global__ void update_kernel(int ne,
 }
 
 
-
+//_Performance_
 void OCOptimizer::update(const float* sens, float* rho, float volratio) {
 	float* newrho;
 	cudaMalloc(&newrho, sizeof(float) * ne);

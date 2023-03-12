@@ -351,7 +351,189 @@ void example_opti_shear_isotropy(cfg::HomoConfig config) {
 
 
 void example_yours(cfg::HomoConfig config) {
-	// add your routines here ...
+	// set output prefix
+	setPathPrefix(config.outprefix);
+	// create homogenization domain
+	Homogenization hom(config);
+	// update config resolution
+	for (int i = 0; i < 3; i++) config.reso[i] = hom.getGrid()->cellReso[i];
+	// define density expression
+	TensorVar<float> rho(config.reso[0], config.reso[1], config.reso[2]);
+
+	Tensor<float> obj(config.reso[0],config.reso[1],config.reso[2]);
+	obj.reset();
+	// initialize density
+	initDensity(rho, config);
+	// output initial density
+	rho.value().toVdb(getPath("initRho"));
+	// define material interpolation term
+	float beta=-10.f;
+	//Erode
+	auto rhop1 = (rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(3)*(-beta)+beta).exp();
+	//Dilate
+	//auto rhop2 = (((rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(3))*beta).exp()+1.f).pow(-1)*2.f-1.f;
+	auto rhop=rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(3);
+	// create elastic tensor expression
+	auto Ch = genCH(hom, rhop);
+	auto Ch1 = genCH(hom, rhop1);
+	//auto Ch2 = genCH(hom, rhop2);
+	AbortErr();
+	// create a oc optimizer
+	int ne = config.reso[0] * config.reso[1] * config.reso[2];
+	MMAOptimizer mma(3, ne, -1, -1, 1000, 1);
+	mma.setBound(0.001, 1);
+	// record objective value
+	std::vector<double> objlist;
+	// convergence criteria
+	ConvergeChecker criteria(config.finthres);
+	// main loop of optimization
+	for (int iter = 0; iter < config.max_iter; iter++) {
+		// define objective expression
+		auto objective =-(Ch(0, 0) + Ch(1, 1) + Ch(2, 2) +
+		(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 9.f; // bulk modulus
+		auto objective1 = -(Ch1(0, 0) + Ch1(1, 1) + Ch1(2, 2) +
+		(Ch1(0, 1) + Ch1(0, 2) + Ch1(1, 2)) * 2) / 9.f; // bulk modulus
+		//auto objective2 = -(Ch2(0, 0) + Ch2(1, 1) + Ch2(2, 2) +
+		//(Ch2(0, 1) + Ch2(0, 2) + Ch2(1, 2)) * 2) / 9.f; // bulk modulus
+		// abort when cuda error occurs
+		AbortErr();
+		float val = objective.eval();
+		// record objective value
+		objlist.emplace_back(val);
+		// compute derivative
+		objective.backward(1);
+		// output to screen
+		printf("\033[32m\n * Iter %d   obj = %.4e\033[0m\n", iter, val);
+		// check convergence
+		if (criteria.is_converge(iter, val)) { printf("= converged\n"); break; }
+		// make sensitivity symmetry
+		symmetrizeField(rho.diff(), config.sym);
+		// objective derivative
+		auto objGrad = rho.diff().flatten();
+
+ 		float val1 = objective1.eval();
+        // compute derivative
+		objective1.backward(1);
+		// make sensitivity symmetry
+		symmetrizeField(rho.diff(), config.sym);
+		// objective derivative
+		auto objGrad1 = rho.diff().flatten();
+
+		/*float val2 = objective2.eval();
+        // compute derivative
+		objective2.backward(1);
+		// make sensitivity symmetry
+		symmetrizeField(rho.diff(), config.sym);
+		// objective derivative
+		auto objGrad2 = rho.diff().flatten();*/
+		
+		// constrain value
+		auto gval = getTempPool().getUnifiedBlock<float>();
+		float vol_scale = 1000.f;
+		float vol_ratio = rho.value().sum() / ne;
+		printf("vol: %f\n", vol_ratio);
+		gval.proxy<float>()[0] = (vol_ratio - config.volRatio) * vol_scale;
+		gval.proxy<float>()[1] = val; 
+		gval.proxy<float>()[2] = val1;
+		//gval.proxy<float>()[3] = val2;
+		// constrain derivative
+		auto vol_ones = rho.diff().flatten();
+		vol_ones.reset(vol_scale / ne);
+		float* dgdx[3] = { vol_ones.data(),objGrad.data(),objGrad1.data()};//,objGrad2.data()};
+		// design variables
+		auto rhoArray = rho.value().flatten();
+		// mma update
+		mma.update(iter, rhoArray.data(), obj.data(), gval.data<float>(), dgdx);
+		//update variable
+		rho.value().graft(rhoArray.data());
+		// output temp results
+		logIter(iter, config, rho, Ch, val);
+	}
+	//rhop.value().toMatlab("rhofinal");
+	hom.grid->writeDensity(getPath("density"), VoxelIOFormat::openVDB);
+	hom.grid->array2matlab("objlist", objlist.data(), objlist.size());
+	rho.value().toVdb(getPath("rho"));
+	Ch.writeTo(getPath("C"));
+
+	freeMem();
+}
+
+void example2(cfg::HomoConfig config) {
+	// set output prefix
+	setPathPrefix(config.outprefix);
+	// create homogenization domain
+	Homogenization hom(config);
+	// update config resolution
+	for (int i = 0; i < 3; i++) config.reso[i] = hom.getGrid()->cellReso[i];
+	// define density expression
+	TensorVar<float> rho(config.reso[0], config.reso[1], config.reso[2]);
+	// initialize density
+	initDensity(rho, config);
+	// output initial density
+	rho.value().toVdb(getPath("initRho"));
+	float beta=-10.f;
+	// define material interpolation term
+	//auto rhop = rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(3);
+	//Erode
+	//auto rhop = (rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(3)*(-beta)+beta).exp();
+	//Dilate
+	auto rhop = (((rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(3))*beta).exp()+1.f).pow(-1)*2.f-1.f;
+	// create elastic tensor expression
+	auto Ch = genCH(hom, rhop);
+	AbortErr();
+	// create a oc optimizer
+	int ne = config.reso[0] * config.reso[1] * config.reso[2];
+	MMAOptimizer mma(1, ne, 1, 0, 1000, 1);
+	mma.setBound(0.001, 1);
+	// record objective value
+	std::vector<double> objlist;
+	// convergence criteria
+	ConvergeChecker criteria(config.finthres);
+	// main loop of optimization
+	for (int iter = 0; iter < config.max_iter; iter++) {
+		// define objective expression
+		auto objective = -(Ch(0, 0) + Ch(1, 1) + Ch(2, 2) +
+		(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 9.f; // bulk modulus
+		// abort when cuda error occurs
+		AbortErr();
+		float val = objective.eval();
+		// record objective value
+		objlist.emplace_back(val);
+		// compute derivative
+		objective.backward(1);
+		// output to screen
+		printf("\033[32m\n * Iter %d   obj = %.4e\033[0m\n", iter, val);
+		// check convergence
+		if (criteria.is_converge(iter, val)) { printf("= converged\n"); break; }
+		// make sensitivity symmetry
+		symmetrizeField(rho.diff(), config.sym);
+		// objective derivative
+		auto objGrad = rho.diff().flatten();
+		
+		// constrain value
+		auto gval = getTempPool().getUnifiedBlock<float>();
+		float vol_scale = 1000.f;
+		float vol_ratio = rho.value().sum() / ne;
+		gval.proxy<float>()[0] = (vol_ratio - config.volRatio) * vol_scale;
+		// constrain derivative
+		auto vol_ones = rho.diff().flatten();
+		vol_ones.reset(vol_scale / ne);
+		float* dgdx[1] = { vol_ones.data() };
+		// design variables
+		auto rhoArray = rho.value().flatten();
+		// mma update
+		mma.update(iter, rhoArray.data(), objGrad.data(), gval.data<float>(), dgdx);
+		//update variable
+		rho.value().graft(rhoArray.data());
+		// output temp results
+		logIter(iter, config, rho, Ch, val);
+	}
+	//rhop.value().toMatlab("rhofinal");
+	hom.grid->writeDensity(getPath("density"), VoxelIOFormat::openVDB);
+	hom.grid->array2matlab("objlist", objlist.data(), objlist.size());
+	rho.value().toVdb(getPath("rho"));
+	Ch.writeTo(getPath("C"));
+
 }
 
 void runCustom(cfg::HomoConfig config) {
@@ -359,6 +541,7 @@ void runCustom(cfg::HomoConfig config) {
 	//example_opti_npr(config);
 	//example_opti_shear_isotropy(config);
 	example_yours(config);
+	//example2(config);
 }
 
 

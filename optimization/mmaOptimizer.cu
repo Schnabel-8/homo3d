@@ -34,6 +34,7 @@ namespace homo {
 			acdhost[i + m] = c;
 			acdhost[i + 2 * m] = d;
 		}
+		acdhost[0] = 0;
 		context->acd.set(acdhost.data());
 
 		void* dgdxdata;

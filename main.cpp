@@ -35,7 +35,7 @@ int main(int argc, char** argv)
 	//test_NegativePoisson();
 	homo::setPathPrefix(config.outprefix);
 	try {
-		testHomogenization(config);
+		//testHomogenization(config);
 		runInstance(config);
 	}
 	catch (std::runtime_error e) {

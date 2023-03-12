@@ -3,7 +3,7 @@
 #ifndef __OPENVDB_WRAPPER_H
 #define __OPENVDB_WRAPPER_H
 
-#include <openvdb/openvdb.h>
+#include "openvdb/openvdb.h"
 #include "vector"
 #include "type_traits"
 #include "string"
