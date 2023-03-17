@@ -574,6 +574,10 @@ void runInstance(cfg::HomoConfig config) {
 		runCustom(config); 
 		return ;
 	}
+	else if(config.obj==cfg::Objective::npr){
+		optiNpr2(config);
+		return ;
+	}
 	// set output prefix
 	setPathPrefix(config.outprefix);
 	// create homogenization domain

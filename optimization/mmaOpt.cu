@@ -844,6 +844,7 @@ gv::gVector<double> mmasub_ker(int nconstrain, int nvar,
 
 	size_t nvarpitch = dgdxvarpitch;
 
+	//double epsimin = 1e-7;
 	double epsimin = 1e-7;
 	double raa0 = 1e-5;
 	double albefa = 0.1;
