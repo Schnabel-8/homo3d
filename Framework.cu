@@ -7,29 +7,30 @@ using namespace homo;
 using namespace culib;
 using nlohmann::json;
 
-#define CONFIG config.push_back(string("funtion = ")+string(__FUNCTION__));\
-			   config.push_back(string("resolution= ")+to_string(config.reso[0]));
+#define CONFIG configvec.push_back(string("funtion = ")+string(__FUNCTION__));\
+			   configvec.push_back(string("resolution= ")+to_string(config.reso[0]));
 
 # define JSON_INIT  using std::vector;\
 					using std::string;\
 					using std::to_string;\
 					vector<float> vec_obj,vec_volfrac,vec_constrain1,vec_constrain2,vec_time_eq,vec_time_mma;\
 					json js;\
-				    vector<string> config;
-
-# define JSON_EMPLACE vec_obj.push_back(val);\
-					  vec_constrain1.push_back(val1);\
-					  vec_volfrac.push_back(vol_ratio);\
-					  vec_time_eq.push_back(time_eq);\
-					  vec_time_mma.push_back(time_mma);
+				    std::ofstream o("debug.json");\
+				    vector<string> configvec;
 					  
-# define JSON_OUTPUT js["obj"]=vec_obj;\
+# define JSON_OUTPUT vec_obj.push_back(val);\
+					 vec_constrain1.push_back(val1);\
+					 vec_volfrac.push_back(vol_ratio);\
+					 vec_time_eq.push_back(time_eq);\
+					 vec_time_mma.push_back(time_mma);\
+					 js["obj"]=vec_obj;\
 					 js["volfrac"]=vec_volfrac;\
 					 js["constrain1"]=vec_constrain1;\
 					 js["constrain2"]=vec_constrain2;\
 					 js["time_eq"]=vec_time_eq;\
 					 js["time_mma"]=vec_time_mma;\
-					 std::ofstream o("debug.json");\
+					 js["config"]=configvec;\
+					 o.seekp(0,std::ios::beg);\
 					 o<<std::setw(4)<<js<<std::endl;
 					 
 
@@ -462,6 +463,7 @@ void mma_bulk(cfg::HomoConfig config) {
 
 void robust_bulk(cfg::HomoConfig config) {
 	JSON_INIT
+	CONFIG
 	// set output prefix
 	setPathPrefix(config.outprefix);
 	// create homogenization domain
@@ -569,7 +571,7 @@ void robust_bulk(cfg::HomoConfig config) {
 		gettimeofday(&t3,NULL);
 		time_mma = (t3.tv_sec - t2.tv_sec) + (double)(t3.tv_usec - t2.tv_usec)/1000000.0;
 
-		JSON_EMPLACE
+		JSON_OUTPUT
 	}
 	//rhop.value().toMatlab("rhofinal");
 	hom.grid->writeDensity(getPath("density"), VoxelIOFormat::openVDB);
@@ -577,7 +579,6 @@ void robust_bulk(cfg::HomoConfig config) {
 	rho.value().toVdb(getPath("rho"));
 	Ch.writeTo(getPath("C"));
 
-	JSON_OUTPUT
 	freeMem();
 }
 
