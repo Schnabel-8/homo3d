@@ -20,6 +20,7 @@ using nlohmann::json;
 					  
 # define JSON_OUTPUT vec_obj.push_back(val);\
 					 vec_constrain1.push_back(val1);\
+					 vec_constrain2.push_back(val2);\
 					 vec_volfrac.push_back(vol_ratio);\
 					 vec_time_eq.push_back(time_eq);\
 					 vec_time_mma.push_back(time_mma);\
@@ -484,16 +485,16 @@ void robust_bulk(cfg::HomoConfig config) {
 	//Erode
 	auto rhop1 = (rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(3)*(-beta)+beta).exp();
 	//Dilate
-	//auto rhop2 = (((rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(3))*beta).exp()+1.f).pow(-1)*2.f-1.f;
+	auto rhop2 = (((rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(3))*beta).exp()+1.f).pow(-1)*2.f-1.f;
 	auto rhop=rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(3);
 	// create elastic tensor expression
 	auto Ch = genCH(hom, rhop);
 	auto Ch1 = genCH(hom, rhop1);
-	//auto Ch2 = genCH(hom, rhop2);
+	auto Ch2 = genCH(hom, rhop2);
 	AbortErr();
 	// create a oc optimizer
 	int ne = config.reso[0] * config.reso[1] * config.reso[2];
-	MMAOptimizer mma(3, ne, -1, -1, 1000, 1,1);
+	MMAOptimizer mma(4, ne, -1, -1, 1000, 1,1);
 	mma.setBound(0.001, 1);
 	// record objective value
 	std::vector<double> objlist;
@@ -509,8 +510,8 @@ void robust_bulk(cfg::HomoConfig config) {
 		(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 9.f; // bulk modulus
 		auto objective1 = -(Ch1(0, 0) + Ch1(1, 1) + Ch1(2, 2) +
 		(Ch1(0, 1) + Ch1(0, 2) + Ch1(1, 2)) * 2) / 9.f; // bulk modulus
-		//auto objective2 = -(Ch2(0, 0) + Ch2(1, 1) + Ch2(2, 2) +
-		//(Ch2(0, 1) + Ch2(0, 2) + Ch2(1, 2)) * 2) / 9.f; // bulk modulus
+		auto objective2 = -(Ch2(0, 0) + Ch2(1, 1) + Ch2(2, 2) +
+		(Ch2(0, 1) + Ch2(0, 2) + Ch2(1, 2)) * 2) / 9.f; // bulk modulus
 		// abort when cuda error occurs
 		AbortErr();
 		float val = objective.eval();
@@ -534,7 +535,7 @@ void robust_bulk(cfg::HomoConfig config) {
 		symmetrizeField(rho.diff(), config.sym);
 		// objective derivative
 		auto objGrad1 = rho.diff().flatten();
-#if 0
+#if 1
 		float val2 = objective2.eval();
         // compute derivative
 		objective2.backward(1);
@@ -551,11 +552,11 @@ void robust_bulk(cfg::HomoConfig config) {
 		gval.proxy<float>()[0] = (vol_ratio - config.volRatio) * vol_scale;
 		gval.proxy<float>()[1] = val; 
 		gval.proxy<float>()[2] = val1;
-		//gval.proxy<float>()[3] = val2;
+		gval.proxy<float>()[3] = val2;
 		// constrain derivative
 		auto vol_ones = rho.diff().flatten();
 		vol_ones.reset(vol_scale / ne);
-		float* dgdx[3] = { vol_ones.data(),objGrad.data(),objGrad1.data()};//,objGrad2.data()};
+		float* dgdx[4] = { vol_ones.data(),objGrad.data(),objGrad1.data(),objGrad2.data()};
 		// design variables
 		auto rhoArray = rho.value().flatten();
 
