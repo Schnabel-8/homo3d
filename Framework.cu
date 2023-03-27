@@ -16,10 +16,11 @@ using nlohmann::json;
 					vector<float> vec_obj,vec_volfrac,vec_constrain1,vec_constrain2,vec_time_eq,vec_time_mma;\
 					json js;\
 				    std::ofstream o("debug.json");\
+					float orgv,erdv;\
 				    vector<string> configvec;
 					  
-# define JSON_OUTPUT vec_obj.push_back(val);\
-					 vec_constrain1.push_back(val1);\
+# define JSON_OUTPUT vec_obj.push_back(orgv);\
+					 vec_constrain1.push_back(erdv);\
 					 vec_volfrac.push_back(vol_ratio);\
 					 vec_time_eq.push_back(time_eq);\
 					 vec_time_mma.push_back(time_mma);\
@@ -479,12 +480,12 @@ void robust_bulk(cfg::HomoConfig config) {
 	rho.value().toVdb(getPath("initRho"));
 	// define material interpolation term
 	double beta=0.5;
-    int cycle=30;
-	bool erode_flag=false;
+    int cycle=50;
+	bool erode_flag=true;
 	bool origin_flag=true;
 	//Erode
-	//auto rhop1 = (rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(3)).erd(beta);
-	auto rhop=rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(2).erd(0.5);
+	auto rhop1 = (rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(2)).erd(beta);
+	auto rhop=rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(2);
 	// create elastic tensor expression
 	auto Ch = genCH(hom, rhop);
 /*auto Ch1=genCH(hom,rhop1);
@@ -507,12 +508,10 @@ void robust_bulk(cfg::HomoConfig config) {
 	float *dfdx=nullptr;
 	for (int iter = 0; iter < config.max_iter&&!quit_flag; iter++) {
 		gettimeofday(&t1,NULL);
-		/*if((iter%cycle)==1){
-			if(beta<=16){
+		if((iter%cycle)==0&&beta<=16){
 			beta*=2;
-			}
-			rhop1=(rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(3)).erd(beta);
-		}*/
+			rhop1=(rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(2)).erd(beta);
+		}
 		auto objective =-(Ch(0, 0) + Ch(1, 1) + Ch(2, 2) +
 		(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 9.f; // bulk modulus
 		if(origin_flag){
@@ -534,7 +533,9 @@ void robust_bulk(cfg::HomoConfig config) {
 		// objective derivative
 		objGrad = rho.diff().flatten();
 		}
-/*auto objective1 = -(Ch1(0, 0) + Ch1(1, 1) + Ch1(2, 2) +
+
+		auto Ch1=genCH(hom,rhop1);
+		auto objective1 = -(Ch1(0, 0) + Ch1(1, 1) + Ch1(2, 2) +
 		(Ch1(0, 1) + Ch1(0, 2) + Ch1(1, 2)) * 2) / 9.f; // bulk modulus
 		
 		if(erode_flag){    
@@ -546,7 +547,7 @@ void robust_bulk(cfg::HomoConfig config) {
 		symmetrizeField(rho.diff(), config.sym);
 		// objective derivative
 		objGrad1 = rho.diff().flatten();
-		}*/
+		}
 		
 
 		// constrain value
@@ -566,7 +567,7 @@ void robust_bulk(cfg::HomoConfig config) {
 		gettimeofday(&t2,NULL);
 		time_eq = (t2.tv_sec - t1.tv_sec) + (double)(t2.tv_usec - t1.tv_usec)/1000000.0;
 
-		/*if(val>=val1){
+		if(val>=val1){
 			dfdx=objGrad.data();
 			erode_flag=false;
 		}
@@ -578,18 +579,20 @@ void robust_bulk(cfg::HomoConfig config) {
 		if((iter%3)==0){
 			erode_flag=true;
 			origin_flag=true;
-		}*/
-		dfdx=objGrad.data();
+		}
+		//dfdx=objGrad.data();
 		// mma update
 		mma.update(iter, rhoArray.data(), dfdx, gval.data<float>(), dgdx);
 		//update variable
 		rho.value().graft(rhoArray.data());
 		// output temp results
-		//logIter(iter, config, rho, Ch, val);
+		logIter(iter, config, rho, Ch, val);
 
 		gettimeofday(&t3,NULL);
 		time_mma = (t3.tv_sec - t2.tv_sec) + (double)(t3.tv_usec - t2.tv_usec)/1000000.0;
 
+		orgv=val;
+		erdv=val1;
 		JSON_OUTPUT
 	}
 	//rhop.value().toMatlab("rhofinal");
