@@ -54,6 +54,7 @@ namespace homo {
 	template<typename opExp_t, typename Scalar> struct pow_exp_t;
 	template<typename opExp_t, typename Scalar> struct ln_exp_t;
 	template<typename opExp_t, typename Scalar> struct exp_exp_t;
+	template<typename opExp_t, typename Scalar> struct erd_exp_t;
 	template<typename Scalar = double> struct scalar_exp_t;
 	template<typename subVar = void, typename Scalar = double> struct var_exp_t;
 	template<typename Scalar> struct rvar_exp_t;
@@ -168,6 +169,18 @@ namespace homo {
 			}
 			else {
 				return powf(v, k);
+			}
+		}
+
+		template<typename Scalar>
+		__host_device_func Scalar erd_(Scalar rho, Scalar beta) {
+			if (std::is_same_v<Scalar, double>) {
+				return exp(double(-beta*(1-rho)))-(1-rho)*exp(double(-beta));
+				//return exp(-beta);
+			}
+			else {
+				return expf(float(-beta*(1-rho)))-(1-rho)*expf(float(-beta));
+				//return expf(-beta);
 			}
 		}
 
@@ -354,6 +367,12 @@ namespace homo {
 		__host_device_func auto pow(T2 s) {
 			using T = res_t<Scalar, T2>;
 			return pow_exp_t<subExp_t, T>(static_cast<subExp_t*>(this)->template refer<>(), T(s));
+		}
+
+		template<typename T2, std::enable_if_t<std::is_arithmetic_v<T2>, int> = 0 >
+		__host_device_func auto erd(T2 s) {
+			using T = res_t<Scalar, T2>;
+			return erd_exp_t<subExp_t, T>(static_cast<subExp_t*>(this)->template refer<>(), T(s));
 		}
 
 		__host_device_func auto log(void) {
@@ -650,6 +669,31 @@ namespace homo {
 
 		__host_device_func void backward_imp(Scalar lastdiff) {
 			Base::op.backward(lastdiff * s * Base::value() * (1 - Base::value()));
+		}
+	};
+
+	// erd function
+	template<typename opExp_t, typename Scalar>
+	struct erd_exp_t
+		: public unary_exp_t<erd_exp_t, opExp_t, Scalar>
+	{
+		using Base = unary_exp_t<erd_exp_t, opExp_t, Scalar>;
+		Scalar beta = 0.5;
+		__host_device_func erd_exp_t(const opExp_t& op, Scalar beta_ = 0.5)
+			: Base(op), beta(beta_)
+		{ }
+
+		__host_device_func Scalar eval_imp(void) {
+			Scalar rho=Base::op.eval();
+			Scalar ret=exp(-beta*(1-rho))-(1-rho)*exp(-beta);
+			return ret;
+			//return (rho+0.5)/2;
+		}
+
+		__host_device_func void backward_imp(Scalar lastdiff) {
+			Scalar rho=Base::value();
+			Base::op.backward(lastdiff * (beta*exp(beta*rho-beta)+exp(-beta)));
+			//Base::op.backward(lastdiff);
 		}
 	};
 
