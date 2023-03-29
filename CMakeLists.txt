@@ -13,6 +13,7 @@ set(Eigen3_DIR /media/mezzrow/585b9bb8-4d7e-402b-9c83-1f14cdf6c416/Eigen3/)
 set(gflags_DIR /media/mezzrow/585b9bb8-4d7e-402b-9c83-1f14cdf6c416/gflags/)
 set(JSON_BuildTests OFF CACHE INTERNAL "")
 add_subdirectory(json-3.11.2)
+include_directories(utils)
 endif()
 
 message(STATUS "C Compiler: ${CMAKE_C_COMPILER}")
@@ -89,7 +90,8 @@ message(STATUS "deprecated sources : ${deprefiles}")
 add_library(cubin STATIC ${cudafiles})
 set_target_properties(cubin PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 set_target_properties(cubin PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
-set_target_properties(cubin PROPERTIES CUDA_ARCHITECTURES "52;61;75;86")
+#set_target_properties(cubin PROPERTIES CUDA_ARCHITECTURES "52;61;75;86")
+set_target_properties(cubin PROPERTIES CUDA_ARCHITECTURES "61")
 # set_target_properties(cubin PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_compile_options(cubin PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
 	--relocatable-device-code=true

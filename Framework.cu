@@ -1,165 +1,13 @@
-#include "homogenization/Framework.cuh"
-#include<csignal>
-#include<fstream>
-#include"nlohmann/json.hpp"
-#include<sys/time.h>
-using namespace homo;
-using namespace culib;
-using nlohmann::json;
+#pragma once
+#include "utils/robust.h"
 
-#define CONFIG configvec.push_back(string("funtion = ")+string(__FUNCTION__));\
-			   configvec.push_back(string("resolution= ")+to_string(config.reso[0]));
-
-# define JSON_INIT  using std::vector;\
-					using std::string;\
-					using std::to_string;\
-					vector<float> vec_obj,vec_volfrac,vec_constrain1,vec_constrain2,vec_time_eq,vec_time_mma;\
-					json js;\
-				    std::ofstream o("debug.json");\
-					float orgv,erdv;\
-				    vector<string> configvec;
-					  
-# define JSON_OUTPUT vec_obj.push_back(orgv);\
-					 vec_constrain1.push_back(erdv);\
-					 vec_volfrac.push_back(vol_ratio);\
-					 vec_time_eq.push_back(time_eq);\
-					 vec_time_mma.push_back(time_mma);\
-					 js["obj"]=vec_obj;\
-					 js["volfrac"]=vec_volfrac;\
-					 js["constrain1"]=vec_constrain1;\
-					 js["constrain2"]=vec_constrain2;\
-					 js["time_eq"]=vec_time_eq;\
-					 js["time_mma"]=vec_time_mma;\
-					 js["config"]=configvec;\
-					 o.seekp(0,std::ios::beg);\
-					 o<<std::setw(4)<<js<<std::endl;
-					 
-
-int quit_flag=0;
-
-template<typename CH>
-void logIter(int iter, cfg::HomoConfig config, TensorVar<>& rho, CH& Ch, double obj) {
-	/// fixed log 
-	if (iter % 5 == 0) {
-		rho.value().toVdb(getPath("rho"));
-		//rho.diff().toVdb(getPath("sens"));
-		Ch.writeTo(getPath("C"));
-	}
-	Ch.domain_.logger() << "finished iteration " << iter << std::endl;
-
-	/// optional log
-	char namebuf[100];
-	if (config.logrho != 0 && iter % config.logrho == 0) {
-		sprintf_s(namebuf, "rho_%04d", iter);
-		rho.value().toVdb(getPath(namebuf));
-	}
-
-	if (config.logc != 0 && iter % config.logc == 0) {
-		sprintf_s(namebuf, "Clog");
-		//Ch.writeTo(getPath(namebuf));
-		auto ch = Ch.data();
-		std::ofstream ofs;
-		if (iter == 0) {
-			ofs.open(getPath(namebuf));
-		} else {
-			ofs.open(getPath(namebuf), std::ios::app);
-		}
-		ofs << "iter " << iter << " ";
-		for (int i = 0; i < 36; i++) { ofs << ch[i] << " "; }
-		ofs << std::endl;
-		ofs.close();
-	}
-
-	if (config.logsens != 0 && iter % config.logsens == 0) {
-		sprintf_s(namebuf, "sens_%04d", iter);
-		//rho.diff().graft(sens.data());
-		rho.diff().toVdb(getPath(namebuf));
-	}
-
-	if (config.logobj != 0 && iter % config.logobj == 0) {
-		sprintf_s(namebuf, "objlog");
-		std::ofstream ofs;
-		if (iter == 0) {
-			ofs.open(getPath(namebuf));
-		}
-		else {
-			ofs.open(getPath(namebuf), std::ios::app);
-		}
-		ofs << "iter " << iter << " ";
-		ofs << "obj = " << obj << std::endl;
-		ofs.close();
-	}
-}
-
-void initDensity(var_tsexp_t<>& rho, cfg::HomoConfig config) {
-	int resox = rho.value().length(0);
-	int resoy = rho.value().length(1);
-	int resoz = rho.value().length(2);
-	constexpr float pi = 3.1415926;
-	if (config.winit == cfg::InitWay::random || config.winit == cfg::InitWay::randcenter) {
-		randTri(rho.value(), config);
-	} else if (config.winit == cfg::InitWay::manual) {
-		rho.value().fromVdb(config.inputrho, false);
-	} else if (config.winit == cfg::InitWay::interp) {
-		rho.value().fromVdb(config.inputrho, true);
-	} else if (config.winit == cfg::InitWay::rep_randcenter) {
-		randTri(rho.value(), config);
-	} else if (config.winit == cfg::InitWay::noise) {
-		rho.value().rand(0.f, 1.f);
-		symmetrizeField(rho.value(), config.sym);
-		rho.value().proj(20.f, 0.5f);
-		auto view = rho.value().view();
-		auto ker = [=] __device__(int id) { return  view(id); };
-		float s = config.volRatio / (sequence_sum(ker, view.size(), 0.f) / view.size());
-		rho.value().mapInplace([=] __device__(int x, int y, int z, float val) {
-			float newval = val * s;
-			if (newval < 0.001f) newval = 0.001;
-			if (newval >= 1.f) newval = 1.f;
-			return newval;
-		});
-	} else if (config.winit == cfg::InitWay::P) {
-		rho.rvalue().setValue([=]__device__(int i, int j, int k) {
-			float p[3] = { float(i) / resox, float(j) / resoy , float(k) / resoz };
-			float val = cosf(2 * pi * p[0]) + cosf(2 * pi * p[1]) + cosf(2 * pi * p[2]);
-			auto newval = tanproj(-val, 20);
-			newval = max(min(newval, 1.f), 0.001f);
-			return newval;
-		});
-	} else if (config.winit == cfg::InitWay::G) {
-		rho.rvalue().setValue([=]__device__(int i, int j, int k) {
-			float p[3] = { float(i) / resox, float(j) / resoy, float(k) / resoz };
-			float s[3], c[3];
-			for (int i = 0; i < 3; i++) {
-				s[i] = sin(2 * pi * p[i]);
-				c[i] = cos(2 * pi * p[i]);
-			}
-			float val = s[0] * c[1] + s[2] * c[0] + s[1] * c[2];
-			auto newval = tanproj(val, 20);
-			newval = max(min(newval, 1.f), 0.001f);
-			return newval;
-		});
-	} else if (config.winit == cfg::InitWay::D) {
-		rho.rvalue().setValue([=] __device__(int i, int j, int k) {
-			float p[3] = { float(i) / resox, float(j) / resoy, float(k) / resoz };
-			float x = p[0], y = p[1], z = p[2];
-			float val = cos(2 * pi * x) * cos(2 * pi * y) * cos(2 * pi * z) - sin(2 * pi * x) * sin(2 * pi * y) * sin(2 * pi * z);
-			float newval = tanproj(val, 20);
-			newval = max(min(newval, 1.f), 0.001f);
-			return newval;
-		});
-	} else if (config.winit == cfg::InitWay::IWP) {
-		rho.rvalue().setValue([=] __device__(int i, int j, int k) {
-			float p[3] = { float(i) / resox, float(j) / resoy, float(k) / resoz };
-			float x = p[0], y = p[1], z = p[2];
-			float val = 2 * (cos(2 * pi * x) * cos(2 * pi * y) + cos(2 * pi * y) * cos(2 * pi * z) + cos(2 * pi * z) * cos(2 * pi * x)) -
-				(cos(2 * 2 * pi * x) + cos(2 * 2 * pi * y) + cos(2 * 2 * pi * z));
-			float newval = tanproj(val, 20);
-			newval = max(min(newval, 1.f), 0.001f);
-			return newval;
-		});
-	}
-
-	symmetrizeField(rho.value(), config.sym);
+void erode_bulk(cfg::HomoConfig config) {
+	ROBUST_BULK(0.5,30,\
+	-(Ch(0, 0) + Ch(1, 1) + Ch(2, 2) +(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 9.f,\
+	-(Ch1(0, 0) + Ch1(1, 1) + Ch1(2, 2) +(Ch1(0, 1) + Ch1(0, 2) + Ch1(1, 2)) * 2) / 9.f,\
+	(rho.pow(2)),\
+	(rho.pow(2)).erd(beta)\
+	)
 }
 
 
@@ -177,21 +25,22 @@ void example_opti_bulk(cfg::HomoConfig config) {
 	// output initial density
 	rho.value().toVdb(getPath("initRho"));
 	// define material interpolation term
+	float beta=0.5;
 #if 1
-	auto rhop = rho.pow(2).erd(10);
+	auto rhop = rho.pow(2).erd(beta);
 #else
-	auto rhop = rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(3);
+	auto rhop = rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(2).erd(beta);
 #endif
 	// create elastic tensor expression
 	//auto Ch = genCH(hom, rhop);
-	elastic_tensor_t<float, decltype(rhop)> Ch(hom, rhop);
+	//elastic_tensor_t<float, decltype(rhop)> Ch(hom, rhop);
 	AbortErr();
 	// create a oc optimizer
 	OCOptimizer oc(0.001, config.designStep, config.dampRatio);
 	// define objective expression
 #if 1
-	auto objective = -(Ch(0, 0) + Ch(1, 1) + Ch(2, 2) +
-		(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 9.f; // bulk modulus
+	//auto objective = -(Ch(0, 0) + Ch(1, 1) + Ch(2, 2) +
+	//	(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 9.f; // bulk modulus
 #else
 	auto objective = -(Ch(0, 0) + Ch(1, 1) + Ch(2, 2) +
 		(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 9.f; // shear modulus
@@ -202,6 +51,13 @@ void example_opti_bulk(cfg::HomoConfig config) {
 	ConvergeChecker criteria(config.finthres);
 	// main loop of optimization
 	for (int iter = 0; iter < config.max_iter; iter++) {
+		if((iter%30==0)&&beta<=16){
+			beta*=2;
+			rhop=  rho.pow(2).erd(beta);
+		}
+		auto Ch=genCH(hom, rhop);
+		auto objective = -(Ch(0, 0) + Ch(1, 1) + Ch(2, 2) +
+		(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 9.f; // bulk modulus
 		// abort when cuda error occurs
 		AbortErr();
 		float val = objective.eval();
@@ -212,7 +68,7 @@ void example_opti_bulk(cfg::HomoConfig config) {
 		// output to screen
 		printf("\033[32m\n * Iter %d   obj = %.4e\033[0m\n", iter, val);
 		// check convergence
-		if (criteria.is_converge(iter, val)) { printf("= converged\n"); break; }
+		//if (criteria.is_converge(iter, val)) { printf("= converged\n"); break; }
 		// make sensitivity symmetry
 		symmetrizeField(rho.diff(), config.sym);
 #if 1
@@ -231,9 +87,10 @@ void example_opti_bulk(cfg::HomoConfig config) {
 	hom.grid->writeDensity(getPath("density"), VoxelIOFormat::openVDB);
 	hom.grid->array2matlab("objlist", objlist.data(), objlist.size());
 	rho.value().toVdb(getPath("rho"));
-	Ch.writeTo(getPath("C"));
+	//Ch.writeTo(getPath("C"));
 }
 
+#if 0
 void example_opti_npr(cfg::HomoConfig config) {
 	// set output prefix
 	setPathPrefix(config.outprefix);
@@ -463,8 +320,8 @@ void mma_bulk(cfg::HomoConfig config) {
 
 
 void robust_bulk(cfg::HomoConfig config) {
-	JSON_INIT
-	CONFIG
+	JSON_INIT;
+	CONFIG;
 	// set output prefix
 	setPathPrefix(config.outprefix);
 	// create homogenization domain
@@ -479,8 +336,8 @@ void robust_bulk(cfg::HomoConfig config) {
 	// output initial density
 	rho.value().toVdb(getPath("initRho"));
 	// define material interpolation term
-	double beta=0.5;
-    int cycle=50;
+	double beta=1;
+    int cycle=30;
 	bool erode_flag=true;
 	bool origin_flag=true;
 	//Erode
@@ -527,7 +384,7 @@ void robust_bulk(cfg::HomoConfig config) {
 		// output to screen
 		printf("\033[32m\n * Iter %d   obj = %.4e\033[0m\n", iter, val);
 		// check convergence
-		if (criteria.is_converge(iter, val)) { printf("= converged\n"); break; }
+		//if (criteria.is_converge(iter, val)) { printf("= converged\n"); break; }
 		// make sensitivity symmetry
 		symmetrizeField(rho.diff(), config.sym);
 		// objective derivative
@@ -593,7 +450,7 @@ void robust_bulk(cfg::HomoConfig config) {
 
 		orgv=val;
 		erdv=val1;
-		JSON_OUTPUT
+		JSON_OUTPUT;
 	}
 	//rhop.value().toMatlab("rhofinal");
 	hom.grid->writeDensity(getPath("density"), VoxelIOFormat::openVDB);
@@ -912,20 +769,20 @@ void example2(cfg::HomoConfig config) {
 
 }
 
-void sig_handler(int signo){
-	quit_flag=1;
-}
+#endif
+
 
 void runCustom(cfg::HomoConfig config) {
-	signal(SIGQUIT,sig_handler);
-	//example_opti_bulk(config);
+	SIG_SET
+	example_opti_bulk(config);
 	//example_opti_npr(config);
 	//example_opti_shear_isotropy(config);
-	robust_bulk(config);
+	//robust_bulk(config);
 	//robust_npr(config);
 	//robust_shear(config);
 	//example2(config);
 	//mma_bulk(config);
+	//erode_bulk(config);
 }
 
 
