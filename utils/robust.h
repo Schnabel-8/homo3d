@@ -1,3 +1,5 @@
+#ifndef ROBUST_H
+#define ROBUST_H
 #include "homogenization/Framework.cuh"
 #include "utils/tools.h"
 #include "utils/output.h"
@@ -21,7 +23,8 @@ enum json_mode{json_off=0,json_on};
 	                    hom.grid->array2matlab("objlist", objlist.data(), objlist.size());\
 	                    rho.value().toVdb(getPath("rho"))
 
-#define ROBUST_BULK_LOOP(beta_value,cycle_value,origin_obj,erode_obj,origin_filter,erode_filter)    float beta=beta_value;\
+#define ROBUST_BULK_LOOP(beta_value,cycle_value,origin_obj,erode_obj,origin_filter,erode_filter)    \
+float beta=beta_value;\
 int cycle=cycle_value;\
 bool erode_flag=true;\
 bool origin_flag=true;\
@@ -53,15 +56,6 @@ for (int iter = 0; iter < config.max_iter&&!quit_flag; iter++) {\
 		}\
 		\
 		erode_flag=true;\
-        if(origin_flag){\
-		AbortErr();\
-		val = objective.eval();\
-		objlist.emplace_back(val);\
-		objective.backward(1);\
-		symmetrizeField(rho.diff(), config.sym);\
-        objGrad = rho.diff();\
-        }\
-        \
         auto Ch1=genCH(hom,rhop1);\
 		auto objective1 = erode_obj;\
         \
@@ -72,18 +66,12 @@ for (int iter = 0; iter < config.max_iter&&!quit_flag; iter++) {\
 		    objGrad1 = rho.diff();\
         }\
         \
-        if(val>=val1){\
-			dfdx=objGrad;\
-			erode_flag=false;\
-		}\
-		else{\
-			dfdx=objGrad1;\
-			origin_flag=false;\
-		}\
         \
 		dfdx=objGrad1;\
-        gettimeofday(&t2,NULL);\
-        time_eq = (t2.tv_sec - t1.tv_sec) + (double)(t2.tv_usec - t1.tv_usec)/1000000.0;\
+		\
+		gettimeofday(&t2,NULL);\
+		time_eq = (t2.tv_sec - t1.tv_sec) + (double)(t2.tv_usec - t1.tv_usec)/1000000.0;\
+       	\
         float vol_ratio = rho.value().sum() / ne;\
 		oc.filterSens(dfdx, rho.value(), float(config.filterRadius));\
 		oc.update(dfdx, rho.value(), config.volRatio);\
@@ -91,16 +79,17 @@ for (int iter = 0; iter < config.max_iter&&!quit_flag; iter++) {\
         \
 		logIter(iter, config, rho, Ch, val);\
         \
-        gettimeofday(&t3,NULL);\
-		time_mma = (t3.tv_sec - t2.tv_sec) + (double)(t3.tv_usec - t2.tv_usec)/1000000.0;\
+		gettimeofday(&t3,NULL);\
+  		time_mma = (t3.tv_sec - t2.tv_sec) + (double)(t3.tv_usec - t2.tv_usec)/1000000.0;\
         \
 		orgv=val;\
 		erdv=val1;\
 		printf("\033[32m\n * Iter %d   origin = %.4e\033[0m    erode = %.4e\033[0m\n", iter, orgv, erdv);\
-		JSON_OUTPUT\
+		JSON_OUTPUT;\
 	}
 
-#define ROBUST_BULK(beta_value,cycle_value,origin_obj,erode_obj,origin_filter,erode_filter)   JSON_INIT;\
+#define ROBUST_BULK(beta_value,cycle_value,origin_obj,erode_obj,origin_filter,erode_filter)   \
+JSON_INIT;\
 CONFIG;\
 ROBUST_INIT;\
 ROBUST_OC_INIT;\
@@ -108,3 +97,22 @@ ROBUST_BULK_LOOP(beta_value,cycle_value,origin_obj,erode_obj,origin_filter,erode
 ROBUST_OUT;
                                                             
 
+/*        if(origin_flag){\
+		AbortErr();\
+		val = objective.eval();\
+		objlist.emplace_back(val);\
+		objective.backward(1);\
+		symmetrizeField(rho.diff(), config.sym);\
+        objGrad = rho.diff();\
+        }\
+        \*/
+
+/*if(val>=val1){\
+			dfdx=objGrad;\
+			erode_flag=false;\
+		}\
+		else{\
+			dfdx=objGrad1;\
+			origin_flag=false;\
+		}\*/
+#endif

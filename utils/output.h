@@ -1,3 +1,5 @@
+#ifndef ROBUST_OUTPUT_H
+#define ROBUST_OUTPUT_H
 #include<csignal>
 #include<fstream>
 #include"nlohmann/json.hpp"
@@ -31,7 +33,7 @@
 					 js["time_mma"]=vec_time_mma;\
 					 js["config"]=configvec;\
 					 o.seekp(0,std::ios::beg);\
-					 o<<std::setw(4)<<js<<std::endl;
+					 o<<std::setw(4)<<js<<std::endl
 
 // sig_handler: type ctrl-\ to quit the running process and save current results
 // remember to involve quit_flag in the loop condition
@@ -45,4 +47,20 @@
 
 SIG_HANDLER
 
-//
+// time: statistics the running time of solving equations and solving optimization problem
+
+#define ROBUST_TIME_INIT \
+struct timeval t1,t2,t3;\
+double time_eq,time_mma
+
+#define ROBUST_TIME1 \
+gettimeofday(&t1,NULL)
+
+#define ROBUST_TIME2 \
+gettimeofday(&t2,NULL);\
+time_eq = (t2.tv_sec - t1.tv_sec) + (double)(t2.tv_usec - t1.tv_usec)/1000000.0
+
+#define ROBUST_TIME3 \
+gettimeofday(&t3,NULL);\
+time_mma = (t3.tv_sec - t2.tv_sec) + (double)(t3.tv_usec - t2.tv_usec)/1000000.0
+#endif
