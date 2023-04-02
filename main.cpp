@@ -14,6 +14,7 @@ extern void test_BulkModulus(void);
 extern void test_ShearModulus(void);
 extern void test_NegativePoisson(void);
 extern void runInstance(cfg::HomoConfig);
+extern void robust_result(cfg::HomoConfig config);
 
 namespace homo {
 	extern std::string setPathPrefix(const std::string& fprefix);

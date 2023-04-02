@@ -177,6 +177,7 @@ namespace homo {
 		__host_device_func Scalar erd_(Scalar rho, Scalar beta) {
 			if (std::is_same_v<Scalar, double>) {
 				return exp((-beta*(1-rho)))-(1-rho)*exp((-beta));
+				//return rho*0.5;
 				//return rho*0.99;
 				//return rho;
 				//return exp((-0.01*(1-rho)))-(1-rho)*(exp(-0.01));
@@ -184,6 +185,7 @@ namespace homo {
 			}
 			else {
 				return expf((-beta*(1-rho)))-(1-rho)*expf((-beta));
+				//return rho*0.5;
 				//return rho*0.99;
 				//return rho;
 				//return expf((-0.01*(1-rho)))-(1-rho)*expf((-0.01));
@@ -715,15 +717,17 @@ namespace homo {
 		__host_device_func Scalar eval_imp(void) {
 			Scalar rho=Base::op.eval();
 			Scalar ret=exp(-beta*(1-rho))-(1-rho)*exp(-beta);
+			//Scalar ret=rho*0.5;
 			return ret;
 			//return rho*0.99;
 			//return rho;
 			//Scalar ret=exp(-0.01*(1-rho))-(1-rho)*exp(-0.01);
-			return ret;
+			
 		}
 
 		__host_device_func void backward_imp(Scalar lastdiff) {
 			Scalar rho=Base::value();
+			//Base::op.backward(lastdiff*0.5);
 			Base::op.backward(lastdiff * (beta*exp(beta*rho-beta)+exp(-beta)));
 			//Base::op.backward(lastdiff*0.99);
 			//Base::op.backward(lastdiff * (0.01*exp(0.01*rho-0.01)+exp(-0.01)));
