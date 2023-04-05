@@ -343,15 +343,15 @@ void example_opti_bulk2(cfg::HomoConfig config) {
 	// output initial density
 	rho.value().toVdb(getPath("initRho"));
 	// define material interpolation term
-	float beta=0;
+	float beta=0,eta=1;
 	float val=0,val1=0;
 	float vol_ratio=0.3;
 	int cycle=50;
 #if 1
 	//.conv(radial_convker_t<float, Spline4>(config.filterRadius))
-	auto rhop = rho.erd(beta).conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(3);
-	auto rhop1=rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(3);
-	auto rhop2=rho.dlt(16).conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(3);
+	auto rhop = rho.tanh(beta,eta).pow(3);
+	auto rhop1=rho.pow(3);
+	auto rhop2=rho.dlt(16).pow(3);
 #else
 	auto rhop = rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(2).erd(beta);
 #endif
@@ -378,7 +378,7 @@ void example_opti_bulk2(cfg::HomoConfig config) {
 	for (int iter = 0; iter < config.max_iter&&!quit_flag; iter++) {
 		if((iter%cycle==0)&&beta<16){
 			beta+=2;
-			rhop=  rho.erd(beta).conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(3);
+			rhop=  rho.tanh(beta,eta).pow(3);
 		}
 		ROBUST_TIME1;
 		/*auto Ch1=genCH(hom,rhop1);
@@ -1217,7 +1217,7 @@ void example2(cfg::HomoConfig config) {
 void runCustom(cfg::HomoConfig config) {
 	SIG_SET
 	//example_opti_bulk3(config);
-	//example_opti_bulk2(config);
+	example_opti_bulk2(config);
 	//example_opti_bulk(config);
 	//example_opti_npr(config);
 	//example_opti_shear_isotropy(config);
@@ -1228,7 +1228,7 @@ void runCustom(cfg::HomoConfig config) {
 	//mma_bulk(config);
 	//erode_bulk(config);
 	//example(config);
-	example_opti_bulk5(config);
+	//example_opti_bulk5(config);
 }
 
 
