@@ -349,7 +349,7 @@ void example_opti_bulk2(cfg::HomoConfig config) {
 	int cycle=50;
 #if 1
 	//.conv(radial_convker_t<float, Spline4>(config.filterRadius))
-	auto rhop = rho.tanh(beta,eta).pow(3);
+	auto rhop = rho.tanh(beta+0.1*eta).pow(3);
 	auto rhop1=rho.pow(3);
 	auto rhop2=rho.dlt(16).pow(3);
 #else
@@ -378,7 +378,7 @@ void example_opti_bulk2(cfg::HomoConfig config) {
 	for (int iter = 0; iter < config.max_iter&&!quit_flag; iter++) {
 		if((iter%cycle==0)&&beta<16){
 			beta+=2;
-			rhop=  rho.tanh(beta,eta).pow(3);
+			rhop=  rho.tanh(beta+0.1*eta).pow(3);
 		}
 		ROBUST_TIME1;
 		/*auto Ch1=genCH(hom,rhop1);

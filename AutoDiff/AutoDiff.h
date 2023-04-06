@@ -55,6 +55,7 @@ namespace homo {
 	template<typename opExp_t, typename Scalar> struct ln_exp_t;
 	template<typename opExp_t, typename Scalar> struct exp_exp_t;
 	template<typename opExp_t, typename Scalar> struct erd_exp_t;
+	template<typename opExp_t, typename Scalar> struct tanh_exp_t;
 	template<typename opExp_t, typename Scalar> struct dlt_exp_t;
 	template<typename Scalar = double> struct scalar_exp_t;
 	template<typename subVar = void, typename Scalar = double> struct var_exp_t;
@@ -189,6 +190,30 @@ namespace homo {
 				//return rho*0.99;
 				//return rho;
 				//return expf((-0.01*(1-rho)))-(1-rho)*expf((-0.01));
+			}
+		}
+
+		template<typename Scalar>
+		__host_device_func Scalar tanh_(Scalar rho, Scalar para) {
+			if (std::is_same_v<Scalar, double>) {
+				double beta=floor(para);
+				double eta=(para-beta)*10;
+				double tmp=beta*eta;
+				double tmp1=rho*beta;
+				double tmp2=(exp(2*tmp)-1)/(exp(2*tmp)+1);
+				double tmp3=(exp(2*(tmp1-tmp))-1)/(exp(2*(tmp1-tmp))+1);
+				double tmp4=(exp(2*(beta-tmp))-1)/(exp(2*(beta-tmp))+1);
+				return (tmp2+tmp3)/(tmp2+tmp4);
+			}
+			else {
+				float beta=floor(para);
+				float eta=(para-beta)*10;
+				float tmp=beta*eta;
+				float tmp1=rho*beta;
+				float tmp2=(expf(2*tmp)-1)/(expf(2*tmp)+1);
+				float tmp3=(expf(2*(tmp1-tmp))-1)/(expf(2*(tmp1-tmp))+1);
+				float tmp4=(expf(2*(beta-tmp))-1)/(expf(2*(beta-tmp))+1);
+				return (tmp2+tmp3)/(tmp2+tmp4);
 			}
 		}
 
@@ -398,6 +423,12 @@ namespace homo {
 		__host_device_func auto erd(T2 s) {
 			using T = res_t<Scalar, T2>;
 			return erd_exp_t<subExp_t, T>(static_cast<subExp_t*>(this)->template refer<>(), T(s));
+		}
+
+		template<typename T2, std::enable_if_t<std::is_arithmetic_v<T2>, int> = 0 >
+		__host_device_func auto tanh(T2 s) {
+			using T = res_t<Scalar, T2>;
+			return tanh_exp_t<subExp_t, T>(static_cast<subExp_t*>(this)->template refer<>(), T(s));
 		}
 
 		template<typename T2, std::enable_if_t<std::is_arithmetic_v<T2>, int> = 0 >
@@ -731,6 +762,43 @@ namespace homo {
 			Base::op.backward(lastdiff * (beta*exp(beta*rho-beta)+exp(-beta)));
 			//Base::op.backward(lastdiff*0.99);
 			//Base::op.backward(lastdiff * (0.01*exp(0.01*rho-0.01)+exp(-0.01)));
+		}
+	};
+
+	// tanh function
+	template<typename opExp_t, typename Scalar>
+	struct tanh_exp_t
+		: public unary_exp_t<tanh_exp_t, opExp_t, Scalar>
+	{
+		using Base = unary_exp_t<tanh_exp_t, opExp_t, Scalar>;
+		Scalar beta =0;
+		Scalar eta=0.5;
+		__host_device_func tanh_exp_t(const opExp_t& op, Scalar para_=0.05)
+			: Base(op)
+		{beta=floor(para_);
+		eta=(para_-beta)*10;}
+
+		__host_device_func Scalar eval_imp(void) {
+			Scalar rho=Base::op.eval();
+			Scalar tmp=beta*eta;
+			Scalar tmp1=rho*beta;
+			Scalar tmp2=(exp(2*tmp)-1)/(exp(2*tmp)+1);
+			Scalar tmp3=(exp(2*(tmp1-tmp))-1)/(exp(2*(tmp1-tmp))+1);
+			Scalar tmp4=(exp(2*(beta-tmp))-1)/(exp(2*(beta-tmp))+1);
+			return (tmp2+tmp3)/(tmp2+tmp4);
+			
+		}
+
+		__host_device_func void backward_imp(Scalar lastdiff) {
+			Scalar rho=Base::value();
+			Scalar tmp=beta*eta;
+			Scalar tmp1=rho*beta;
+			Scalar tmp2=(exp(2*tmp)-1)/(exp(2*tmp)+1);
+			Scalar tmp3=(exp(2*(tmp1-tmp))-1)/(exp(2*(tmp1-tmp))+1);
+			Scalar tmp4=(exp(2*(beta-tmp))-1)/(exp(2*(beta-tmp))+1);
+			Scalar tmp5=exp(2*(tmp1-tmp))/pow(exp(2*(tmp1-tmp))+1,Scalar(2));
+			Base::op.backward(lastdiff * (4*beta*tmp5/(tmp2+tmp4)));
+			
 		}
 	};
 
