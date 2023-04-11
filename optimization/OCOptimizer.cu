@@ -189,6 +189,70 @@ void OCOptimizer::filterSens(Tensor<float> sens, Tensor<float> rho, float radius
 
 template<typename T>
 __global__ void update_Tensor_kernel(TensorView<T> sens, T g,
+	TensorView<T> rhoold, TensorView<T> rhonew,TensorView<T> rhophys,
+	T minRho, T stepLimit, T damp,T beta) {
+	size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+	int ne = rhoold.size();
+	if (tid >= ne) return;
+
+	T rho = rhoold(tid);
+
+	T B = -sens(tid) / g;
+	if (B < 0) B = 0.01f;
+	T newrho = powf(B, damp) * rho;
+
+	if (newrho - rho < -stepLimit) newrho = rho - stepLimit;
+	if (newrho - rho > stepLimit) newrho = rho + stepLimit;
+	if (newrho < minRho) newrho = minRho;
+	if (newrho > 1) newrho = 1;
+	rhonew(tid) = newrho;
+	T newrho2=newrho*2;
+	T ret=0;
+	if(newrho<=0.5){
+					ret=(exp(double(-beta*(1-newrho2)))-(1-newrho2)*exp(double(-beta)))/2;
+				}
+				else{
+					ret=(1-exp(double(-beta*(newrho2-1)))+(newrho2-1)*exp(double(-beta)))/2+0.5;
+				}
+	rhophys(tid)=ret;
+}
+
+void OCOptimizer::update(Tensor<float> sens, Tensor<float> rho, float volratio,float beta) {
+	Tensor<float> newrho(rho.getDim());
+	newrho.reset(0);
+	Tensor<float> physrho(rho.getDim());
+	physrho.reset(0);
+	float maxSens = abs(sens.maxabs());
+	printf("max sens = %f\n", maxSens);
+	float minSens = 0;
+	for (int itn = 0; itn < 20; itn++) {
+		float gSens = (maxSens + minSens) / 2;
+		size_t grid_size, block_size;
+		make_kernel_param(&grid_size, &block_size, rho.size(), 256);
+		update_Tensor_kernel << <grid_size, block_size >> > (sens.view(), gSens, rho.view(), newrho.view(),physrho.view(),
+			minRho, step_limit, damp,beta);
+		cudaDeviceSynchronize();
+		cuda_error_check;
+		//float curVol = parallel_sum(newrho, ne) / ne;
+		float curVol = physrho.sum() / physrho.size();
+		printf("[OC] : g = %.4e   vol = %4.2f%% (Goal %4.2f%%)       \r", gSens, curVol * 100, volratio * 100);
+		if (curVol < volratio - 0.0001) {
+			maxSens = gSens;
+		}
+		else if (curVol > volratio + 0.0001) {
+			minSens = gSens;
+		}
+		else {
+			break;
+		}
+	}
+	printf("\n");
+	rho.copy(newrho);
+}
+
+
+template<typename T>
+__global__ void update_Tensor_kernel(TensorView<T> sens, T g,
 	TensorView<T> rhoold, TensorView<T> rhonew,
 	T minRho, T stepLimit, T damp) {
 	size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -238,5 +302,3 @@ void OCOptimizer::update(Tensor<float> sens, Tensor<float> rho, float volratio) 
 	printf("\n");
 	rho.copy(newrho);
 }
-
-

@@ -16,6 +16,7 @@ namespace homo {
 		void filterSens(float* sens, const float* rho, size_t pitchT, int reso[3],float radius=2);
 		void filterSens(Tensor<float> sens, Tensor<float> rho, float radius = 2);
 		void update(const float* sens, float* rho, float volratio);
+		void update(Tensor<float> sens, Tensor<float>  rho, float volratio,float beta);
 		void update(Tensor<float> sens, Tensor<float>  rho, float volratio);
 	};
 

@@ -3,6 +3,7 @@
 #include "utils/output.h"
 #include <string>
 
+#if 0
 void erode_bulk(cfg::HomoConfig config) {
 	ROBUST_BULK(0.5,30,\
 	-(Ch(0, 0) + Ch(1, 1) + Ch(2, 2) +(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 9.f,\
@@ -11,6 +12,7 @@ void erode_bulk(cfg::HomoConfig config) {
 	(rho.pow(2)).erd(beta)\
 	)
 }
+#endif
 
 
 void example_opti_npr(cfg::HomoConfig config) {
@@ -83,128 +85,37 @@ void robust_result(cfg::HomoConfig config,int mode,const std::string &name){
 	TensorVar<float> rho(config.reso[0], config.reso[1], config.reso[2]);
 	int ne = config.reso[0] * config.reso[1] * config.reso[2];
 	rho.value().fromVdb(getPath(name),1);
-	switch (mode)
-	{
-	case Origin:
-		printf("origin vol_ratio:   %.4e\033[0m\n",rho.value().sum()/ne);
-        rho.value().toVdb(getPath("rho_origin.vdb"));
-		break;
 
-	case Erode:
-		rho.value().proj(16.f,1.f,1.f,0.f);
+
+
+	float val=0;
+	if(mode==Origin){
+		rho.value().proj(16.f,0.5f,1.f,0.f);
+		auto rhop=rho.pow(1);
+		Homogenization hom(config);
+	elastic_tensor_t<float, decltype(rhop)> Ch(hom, rhop);
+	auto objective = -(Ch(0, 0) + Ch(1, 1) + Ch(2, 2) +(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 9.f; // bulk modulus
+		val=objective.eval();
+		printf("origin vol_ratio:   %.4e\033[0m   val:   %.4e\033[0m\n",rho.value().sum()/ne,val);
+        rho.value().toVdb(getPath("rho_origin.vdb"));
+	}
+	else if(mode==Erode){
+		rho.value().proj(32.f,0.75f,1.f,0.f);
 		printf("erode vol_ratio:   %.4e\033[0m\n",rho.value().sum()/ne);
         rho.value().toVdb(getPath("rho_erode.vdb"));
-		break;
+	}
 
-	case Dilate:
-		rho.value().proj(16.f,0.f,1.f,0.f);
+	else{
+		rho.value().proj(32.f,0.25f,1.f,0.f);
 		printf("dilate vol_ratio:   %.4e\033[0m\n",rho.value().sum()/ne);
         rho.value().toVdb(getPath("rho_dilate.vdb"));
-		break;
-	
-	default:
-		printf("Robust_Result:  Mode Invalid!\n");
-		break;
 	}
+
 
 		
 }
 
-void example_opti_bulk5(cfg::HomoConfig config) {
-	// set output prefix
-	setPathPrefix(config.outprefix);
-	// create homogenization domain
-	Homogenization hom(config);
-	// update config resolution
-	for (int i = 0; i < 3; i++) config.reso[i] = hom.getGrid()->cellReso[i];
-	// define density expression
-	TensorVar<float> rho(config.reso[0], config.reso[1], config.reso[2]);
-	// initialize density
-	initDensity(rho, config);
-	// output initial density
-	rho.value().toVdb(getPath("initRho"));
-	// define material interpolation term
-#if 0
-	auto rhop = rho.pow(3);
-#else
-	auto rhop = rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(3);
-#endif
-	// create elastic tensor expression
-	//auto Ch = genCH(hom, rhop);
-	elastic_tensor_t<float, decltype(rhop)> Ch(hom, rhop);
-	AbortErr();
-	// create a oc optimizer
-	OCOptimizer oc(0.001, config.designStep, config.dampRatio);
-	// define objective expression
-#if 1
-	auto objective = -(Ch(0, 0) + Ch(1, 1) + Ch(2, 2) +
-		(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 9.f; // bulk modulus
-#else
-	auto objective = -(Ch(0, 0) + Ch(1, 1) + Ch(2, 2) +
-		(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 9.f; // shear modulus
-#endif
-	// record objective value
-	std::vector<double> objlist;
-	// convergence criteria
-	ConvergeChecker criteria(config.finthres);
-	// main loop of optimization
-	for (int iter = 0; iter < config.max_iter; iter++) {
-		// abort when cuda error occurs
-		AbortErr();
-		float val = objective.eval();
-		// record objective value
-		objlist.emplace_back(val);
-		// compute derivative
-		objective.backward(1);
-		// output to screen
-		printf("\033[32m\n * Iter %d   obj = %.4e\033[0m\n", iter, val);
-		// check convergence
-		if (criteria.is_converge(iter, val)) { printf("= converged\n"); break; }
-		// make sensitivity symmetry
-		symmetrizeField(rho.diff(), config.sym);
-#if 1
-		// filtering the sensitivity
-		oc.filterSens(rho.diff(), rho.value(), config.filterRadius);
-#endif
-		//rho.diff().toMatlab("senscustom");
-		// update density
-		oc.update(rho.diff(), rho.value(), config.volRatio);
-		// make density symmetry
-		symmetrizeField(rho.value(), config.sym);
-		// output temp results
-		logIter(iter, config, rho, Ch, val);
-	}
-	//rhop.value().toMatlab("rhofinal");
-	hom.grid->writeDensity(getPath("density"), VoxelIOFormat::openVDB);
-	hom.grid->array2matlab("objlist", objlist.data(), objlist.size());
-	rho.value().toVdb(getPath("rho_origin.vdb"));
-	Ch.writeTo(getPath("C"));
-
-	robust_result(config,0,"rho_origin.vdb");
-	robust_result(config,1,"rho_origin.vdb");
-	robust_result(config,2,"rho_origin.vdb");
-}
-
-/*void example(){
-	Tensor<float> rho;
-	auto rhop = rho.pow(2).erd(beta);
-	auto rhop1=rho.pow(2);
-	for(){
-		auto Ch=genCH(hom,rhop);
-		auto objective=-(Ch(0, 0) + Ch(1, 1) + Ch(2, 2) +(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 9.f;
-		objective.eval();
-		objective.backward(1);
-
-		auto Ch1=genCH(hom,rhop1);
-		auto objective1=-(Ch1(0, 0) + Ch1(1, 1) + Ch1(2, 2) +(Ch1(0, 1) + Ch1(0, 2) + Ch1(1, 2)) * 2) / 9.f;
-		objective1.eval();
-		objective1.backward(1);
-		
-		oc.update(rho.diff(), rho.value(), config.volRatio);
-	}
-}*/
-
-/*void example_opti_bulk3(cfg::HomoConfig config) {
+void example_opti_bulk3(cfg::HomoConfig config) {
 	JSON_INIT;
 	CONFIG;
 	// set output prefix
@@ -216,79 +127,80 @@ void example_opti_bulk5(cfg::HomoConfig config) {
 	for (int i = 0; i < 3; i++) config.reso[i] = hom.getGrid()->cellReso[i];
 	// define density expression
 	TensorVar<float> rho(config.reso[0], config.reso[1], config.reso[2]);
+
+	Tensor<float> obj(config.reso[0], config.reso[1], config.reso[2]);
+	obj.reset();
 	// initialize density
 	initDensity(rho, config);
 	// output initial density
 	rho.value().toVdb(getPath("initRho"));
-	homo::Tensor<float> obj(config.reso[0], config.reso[1], config.reso[2]);
-	obj.reset();
 	// define material interpolation term
-	float beta=0.25;
-	float val=0,val1=0;
-	float vol_ratio=0.3;
-#if 1
-	auto rhop = rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).erd(beta);
-	auto rhop1=rho.conv(radial_convker_t<float, Spline4>(config.filterRadius));
-#else
-	auto rhop = rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(2).erd(beta);
-#endif
-	// create elastic tensor expression
-	//auto Ch = genCH(hom, rhop);
-	//elastic_tensor_t<float, decltype(rhop)> Ch(hom, rhop);
+	float beta=4;
+	float val=0,val1=0,val2=0;
+	
+	int cycle=30;
+
+	auto rhop = rho.org(beta);
+	auto rhop1=rho.erd(beta);
+	auto rhop2=rho.dlt(beta);
 	AbortErr();
-	// create a oc optimizer
-	//OCOptimizer oc(0.001, config.designStep, config.dampRatio);
-	MMAOptimizer mma(3, ne, -1, -1, 1000, 1,1);
+
+#if 0
+	MMAOptimizer mma(1, ne, 1, 0, 1000, 1);
 	mma.setBound(0.001, 1);
-	// define objective expression
-#if 1
-	//auto objective = -(Ch(0, 0) + Ch(1, 1) + Ch(2, 2) +
-	//	(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 9.f; // bulk modulus
 #else
-	auto objective = -(Ch(0, 0) + Ch(1, 1) + Ch(2, 2) +
-		(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 9.f; // shear modulus
+	OCOptimizer oc(0.001, config.designStep, config.dampRatio);
 #endif
-	// record objective value
-	std::vector<double> objlist;
+
 	// convergence criteria
 	ConvergeChecker criteria(config.finthres);
 	ROBUST_TIME_INIT;
 	// main loop of optimization
 	for (int iter = 0; iter < config.max_iter&&!quit_flag; iter++) {
-		if((iter%50==0)&&beta<=16){
-			beta*=2;
-			rhop=  rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).erd(beta);
+		if((iter%cycle==0)&&beta<14&&iter!=0){
+			beta+=4;
+			rhop1=rho.erd(beta);
+			rhop2=rho.dlt(beta);
 		}
+
 		ROBUST_TIME1;
-		auto Ch1=genCH(hom,rhop1);
-		auto objective1=-(Ch1(0, 0) + Ch1(1, 1) + Ch1(2, 2) +(Ch1(0, 1) + Ch1(0, 2) + Ch1(1, 2)) * 2) / 9.f;
-		val1 = objective1.eval();
-		objective1.backward(1);
-		auto objGrad1=rho.diff().flatten();
 		
+
 		auto Ch=genCH(hom, rhop);
 		auto objective = -(Ch(0, 0) + Ch(1, 1) + Ch(2, 2) +
-		(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 900.f; // bulk modulus
-		// abort when cuda error occurs
+		(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 9.f; // bulk modulus
 		AbortErr();
 		val = objective.eval();
-		// record objective value
-		objlist.emplace_back(val);
-		// compute derivative
-		objective.backward(1);
-		auto objGrad=rho.diff().flatten();
-		// output to screen
-		printf("\033[32m\n * Iter %d   erode = %.4e\033[0m    origin = %.4e\033[0m\n", iter, val,val1);
-		// check convergence
-		//if (criteria.is_converge(iter, val)) { printf("= converged\n"); break; }
-		// make sensitivity symmetry
+		//objective.backward(1);
+		//symmetrizeField(rho.diff(), config.sym);
+		//auto objGrad=rho.diff().flatten();
+
+		/*auto Ch2=genCH(hom, rhop2);
+		auto objective2 = -(Ch2(0, 0) + Ch2(1, 1) + Ch2(2, 2) +
+		(Ch2(0, 1) + Ch2(0, 2) + Ch2(1, 2)) * 2) / 9.f; // bulk modulus
+		AbortErr();
+		val2 = objective2.eval();*/
+		//objective2.backward(1);
+		//symmetrizeField(rho.diff(), config.sym);
+		//auto objGrad2=rho.diff().flatten();
+
+		auto Ch1=genCH(hom, rhop1);
+		auto objective1 = -(Ch1(0, 0) + Ch1(1, 1) + Ch1(2, 2) +
+		(Ch1(0, 1) + Ch1(0, 2) + Ch1(1, 2)) * 2) / 9.f; // bulk modulus
+		AbortErr();
+		val1 = objective1.eval();
+		objective1.backward(1);
 		symmetrizeField(rho.diff(), config.sym);
+		//auto objGrad1=rho.diff().flatten();
+
+		
+
+
+		printf("\033[32m\n * Iter %d   origin = %.4e\033[0m    erode = %.4e\033[0m    dilate = %.4e\033[0m   volfrac = %.4e\033[0m\n", iter, val,val1,val2,rho.value().sum()/ne);
 
 		ROBUST_TIME2;
+
 #if 0
-		// filtering the sensitivity
-		oc.filterSens(rho.diff(), rho.value(), config.filterRadius);
-#endif
 		// constrain value
 		auto gval = getTempPool().getUnifiedBlock<float>();
 		float vol_scale = 1000.f;
@@ -296,35 +208,87 @@ void example_opti_bulk5(cfg::HomoConfig config) {
 		gval.proxy<float>()[0] = (vol_ratio - config.volRatio) * vol_scale;
 		gval.proxy<float>()[1] = val;
 		gval.proxy<float>()[2] = val1;
+		gval.proxy<float>()[3] = val2;
 
 		// constrain derivative
 		auto vol_ones = rho.diff().flatten();
 		vol_ones.reset(vol_scale / ne);
-		float* dgdx[3] = { vol_ones.data(),objGrad.data(),objGrad1.data()};
+		float* dgdx[4] = { vol_ones.data(),objGrad.data(),objGrad1.data(),objGrad2.data()};
 		// design variables
 		auto rhoArray = rho.value().flatten();
-		//rho.diff().toMatlab("senscustom");
-		// update density
-		//oc.update(rho.diff(), rho.value(), config.volRatio);
-		mma.update(iter, rhoArray.data(), obj.flatten().data(), gval.data<float>(), dgdx);
+		mma.update(iter, rhoArray.data(), obj.data(), gval.data<float>(), dgdx);
 		//update variable
 		rho.value().graft(rhoArray.data());
+#elif 0
+		if(val>=val1&&val>=val2){
+			oc.filterSens(objGrad, rho.value(), config.filterRadius);
+			oc.update(objGrad, rho.value(), config.volRatio);
+		}
+		else if(val1>=val&&val1>=val2){
+			oc.filterSens(objGrad1, rho.value(), config.filterRadius);
+			oc.update(objGrad1, rho.value(), config.volRatio);
+		}
+		else {
+			oc.filterSens(objGrad2, rho.value(), config.filterRadius);
+			oc.update(objGrad2, rho.value(), config.volRatio);
+		}
+#elif 0
+		// constrain value
+		auto gval = getTempPool().getUnifiedBlock<float>();
+		float vol_scale = 1000.f;
+		float vol_ratio = rho.value().sum() / ne;
+		gval.proxy<float>()[0] = (vol_ratio - config.volRatio) * vol_scale;
+
+		// constrain derivative
+		auto vol_ones = rho.diff().flatten();
+		vol_ones.reset(vol_scale / ne);
+		float* dgdx[1] = { vol_ones.data()};
+		// design variables
+		auto rhoArray = rho.value().flatten();
+		/*if(val>=val1&&val>=val2){
+			mma.update(iter, rhoArray.data(), objGrad.data(), gval.data<float>(), dgdx);
+		}*/
+		//else 
+		if(val1>=val&&val1>=val2){
+			mma.update(iter, rhoArray.data(), objGrad1.data(), gval.data<float>(), dgdx);
+		}
+		/*else {
+			mma.update(iter, rhoArray.data(), objGrad2.data(), gval.data<float>(), dgdx);
+		}*/
+		//update variable
+		rho.value().graft(rhoArray.data());
+#else
+		oc.filterSens(rho.diff(), rho.value(), config.filterRadius);
+		oc.update(rho.diff(), rho.value(), config.volRatio,beta);
+#endif
+//oc.filterSens(objGrad, rho.value(), config.filterRadius);
+//			oc.update(objGrad, rho.value(), config.volRatio);
 		// make density symmetry
-		//symmetrizeField(rho.value(), config.sym);
+		symmetrizeField(rho.value(), config.sym);
 		// output temp results
 		logIter(iter, config, rho, Ch, val);
 		ROBUST_TIME3;
-		orgv=val1;
-		erdv=val;
+		float orgv=val;
+		float erdv=val1;
+		float dltv=val2;
+		float vol_ratio=rho.value().sum()/ne;
 		JSON_OUTPUT;
 	}
 	
+
 	//rhop.value().toMatlab("rhofinal");
-	hom.grid->writeDensity(getPath("density"), VoxelIOFormat::openVDB);
-	hom.grid->array2matlab("objlist", objlist.data(), objlist.size());
-	rho.value().toVdb(getPath("rho"));
+	//hom.grid->writeDensity(getPath("density"), VoxelIOFormat::openVDB);
+	//hom.grid->array2matlab("objlist", objlist.data(), objlist.size());
+	rho.value().toVdb(getPath("rho.vdb"));
 	//Ch.writeTo(getPath("C"));
-}*/
+
+	printf("\033[32m\n *  erode = %.4e\033[0m\n", val);
+	robust_result(config,0,"rho_origin.vdb");
+	robust_result(config,1,"rho_origin.vdb");
+	robust_result(config,2,"rho_origin.vdb");
+	
+}
+
 
 void example_opti_bulk2(cfg::HomoConfig config) {
 	JSON_INIT;
@@ -417,8 +381,9 @@ void example_opti_bulk2(cfg::HomoConfig config) {
 		// output temp results
 		logIter(iter, config, rho, Ch, val);
 		ROBUST_TIME3;
-		orgv=val;
-		erdv=val1;
+		float orgv=val;
+		float erdv=val1;
+		float dltv=0;
 		JSON_OUTPUT;
 	}
 	
@@ -450,6 +415,7 @@ void example_opti_bulk2(cfg::HomoConfig config) {
 	
 }
 
+
 void example_opti_bulk(cfg::HomoConfig config) {
 	// set output prefix
 	setPathPrefix(config.outprefix);
@@ -464,14 +430,13 @@ void example_opti_bulk(cfg::HomoConfig config) {
 	// output initial density
 	rho.value().toVdb(getPath("initRho"));
 	// define material interpolation term
-	float beta=0.25;
+	float beta=4;
+	int cycle=50;
 #if 1
-	auto rhop = rho.erd(100);
-	/*auto rhop1=rho.pow(2);
-	auto Ch1=genCH(hom,rhop1);
-	auto objective1=-(Ch1(0, 0) + Ch1(1, 1) + Ch1(2, 2) +(Ch1(0, 1) + Ch1(0, 2) + Ch1(1, 2)) * 2) / 9.f;*/
+	auto rhop = rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).org(beta);
+	//auto rhop = rho.org(8);
 #else
-	auto rhop = rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(2).erd(beta);
+	auto rhop = rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).pow(3);
 #endif
 	// create elastic tensor expression
 	//auto Ch = genCH(hom, rhop);
@@ -493,11 +458,15 @@ void example_opti_bulk(cfg::HomoConfig config) {
 	ConvergeChecker criteria(config.finthres);
 	// main loop of optimization
 	for (int iter = 0; iter < config.max_iter&&!quit_flag; iter++) {
-		/*if((iter%30==0)&&beta<=16){
-			beta+=2;
-			rhop=  rho.pow(2).erd(beta);
-		}*/
-		auto Ch=genCH(hom, rhop);
+		if(((iter%cycle)==0)&&beta<=16&&!iter){
+			beta+=4;
+			if(beta>16){
+				beta=16;
+			}
+			rhop = rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).org(beta);
+		}
+
+		elastic_tensor_t<float, decltype(rhop)> Ch(hom, rhop);
 		auto objective = -(Ch(0, 0) + Ch(1, 1) + Ch(2, 2) +
 		(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 9.f; // bulk modulus
 		// abort when cuda error occurs
@@ -510,7 +479,7 @@ void example_opti_bulk(cfg::HomoConfig config) {
 		// output to screen
 		printf("\033[32m\n * Iter %d   obj = %.4e\033[0m\n", iter, val);
 		// check convergence
-		//if (criteria.is_converge(iter, val)) { printf("= converged\n"); break; }
+		if (criteria.is_converge(iter, val)) { printf("= converged\n"); break; }
 		// make sensitivity symmetry
 		symmetrizeField(rho.diff(), config.sym);
 #if 1
@@ -519,7 +488,7 @@ void example_opti_bulk(cfg::HomoConfig config) {
 #endif
 		//rho.diff().toMatlab("senscustom");
 		// update density
-		oc.update(rho.diff(), rho.value(), config.volRatio);
+		oc.update(rho.diff(), rho.value(), config.volRatio,beta);
 		// make density symmetry
 		symmetrizeField(rho.value(), config.sym);
 		// output temp results
@@ -529,6 +498,7 @@ void example_opti_bulk(cfg::HomoConfig config) {
 	hom.grid->writeDensity(getPath("density"), VoxelIOFormat::openVDB);
 	hom.grid->array2matlab("objlist", objlist.data(), objlist.size());
 	rho.value().toVdb(getPath("rho"));
+	robust_result(config,0,"rho");
 	//Ch.writeTo(getPath("C"));
 }
 
@@ -1216,8 +1186,8 @@ void example2(cfg::HomoConfig config) {
 
 void runCustom(cfg::HomoConfig config) {
 	SIG_SET
-	//example_opti_bulk3(config);
-	example_opti_bulk2(config);
+	example_opti_bulk3(config);
+	//example_opti_bulk2(config);
 	//example_opti_bulk(config);
 	//example_opti_npr(config);
 	//example_opti_shear_isotropy(config);
@@ -1229,6 +1199,7 @@ void runCustom(cfg::HomoConfig config) {
 	//erode_bulk(config);
 	//example(config);
 	//example_opti_bulk5(config);
+	//robust_result(config,1,"rhod.vdb");
 }
 
 

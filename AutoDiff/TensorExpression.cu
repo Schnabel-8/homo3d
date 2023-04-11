@@ -110,7 +110,7 @@ __global__ void projectTensor_kernel(TensorView<T> tf, float beta, float tau, fl
 	float rho = a * tf(eid) + b;
 	rho = tanproj(rho, beta, tau);
 	if (rho < 0.5) rho = 1e-9;
-	if (rho > 0.5) rho = 1;
+	if (rho >= 0.5) rho = 1;
 	tf(eid) = rho;
 }
 

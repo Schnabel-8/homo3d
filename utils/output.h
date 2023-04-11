@@ -22,6 +22,7 @@
 					  
 # define JSON_OUTPUT vec_origin.push_back(orgv);\
 					 vec_erode.push_back(erdv);\
+					 vec_dilate.push_back(dltv);\
 					 vec_volfrac.push_back(vol_ratio);\
 					 vec_time_eq.push_back(time_eq);\
 					 vec_time_mma.push_back(time_mma);\
