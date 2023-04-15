@@ -26,6 +26,7 @@ namespace homo {
 	extern void vdb2tensor(const std::string& fname, TensorView<float> tf, bool interpolation = true);
 	extern void loadvdb(const std::string& filename, std::vector<int> pos[3], std::vector<float>& gridvalues);
 	extern void tensorProject(TensorView<float> tf, float beta, float eta, float a, float b);
+	extern void tensorMultiply(TensorView<float> ta,TensorView<float> tb);
 
 	struct HomoTraits;
 
@@ -277,6 +278,10 @@ namespace homo {
 		}
 		void proj(float beta = 20.f, float eta = 0.5f, float a = 1.f, float b = 0.f) {
 			tensorProject(view(), beta, eta, a, b);
+		}
+		// a.multiply(b) : a[i]=a[i]*b[i]
+		void multiply(Tensor<T> b){
+			tensorMultiply(view(),b.view());
 		}
 		template<int N >
 		static Tensor<T> range(std::array<T, N> start, std::array<T, N> end, std::array<int, N> steps, Order axis) {

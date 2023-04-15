@@ -121,3 +121,20 @@ void homo::tensorProject(TensorView<float> tf, float beta, float tau, float a, f
 	cudaDeviceSynchronize();
 	cuda_error_check;
 }
+
+
+template<typename T>
+__global__ void tensorMultiply_kernel(TensorView<T> ta,TensorView<float> tb) {
+	size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+	if (tid >= ta.size()) return;
+	int eid = tid;
+	ta(eid) = ta(eid)*tb(eid);
+}
+
+void homo::tensorMultiply(TensorView<float> ta,TensorView<float> tb) {
+	size_t grid_size, block_size;
+	make_kernel_param(&grid_size, &block_size, ta.size(), 256);
+	tensorMultiply_kernel << <grid_size, block_size >> > (ta,tb);
+	cudaDeviceSynchronize();
+	cuda_error_check;
+}

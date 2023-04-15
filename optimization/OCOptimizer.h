@@ -20,6 +20,9 @@ namespace homo {
 		void update(Tensor<float> sens, Tensor<float>  rho, float volratio);
 	};
 
+	void robust_filter_proj(Tensor<float> sens, Tensor<float> rho, float radius /*= 2*/,float eta,float beta) ;
+	void robust_filter(Tensor<float> sens, Tensor<float> rho, float radius /*= 2*/,float scale);
+
 }
 
 

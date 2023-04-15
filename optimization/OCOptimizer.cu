@@ -302,3 +302,119 @@ void OCOptimizer::update(Tensor<float> sens, Tensor<float> rho, float volratio) 
 	printf("\n");
 	rho.copy(newrho);
 }
+
+template<typename Kernel>
+__global__ void robust_filter_proj_kernel(
+	TensorView<float> sens, TensorView<float> rho, TensorView<float> newsens,TensorView<float> newsens1, Kernel wfunc,float eta,float beta) {
+	size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+	int ne = rho.size();
+	int reso[3] = { rho.size(0),rho.size(1),rho.size(2) };
+	if (tid >= ne) return;
+	int epos[3] = { tid % reso[0], tid / reso[0] % reso[1], tid / (reso[0] * reso[1]) };
+	float wsum = 0;
+	Kernel ker = wfunc;
+	float sum = 0;
+	for (int nei = 0; nei < wfunc.size(); nei++) {
+		int offset[3];
+		ker.neigh(nei, offset);
+		float w = ker.weight(offset);
+		int neighpos[3] = { epos[0] + offset[0], epos[1] + offset[1], epos[2] + offset[2] };
+		if (ker.is_period()) {
+			for (int i = 0; i < 3; i++) neighpos[i] = (neighpos[i] + reso[i]) % reso[i];
+		}
+		if (is_bounded(neighpos, reso)) {
+			//int neighid = neighpos[0] + (neighpos[1] + neighpos[2] * ereso[1]) * pitchT;
+			//w /= weightSum[neighid];
+			sum += rho(neighpos[0], neighpos[1], neighpos[2])* w;
+			wsum += w;
+		} 
+	}
+	//int eid = epos[0] + (epos[1] + epos[2] * ereso[1]) * pitchT;
+	sum /= wsum ;//xTilde
+
+
+	//xDilate
+	double rho1=sum;
+	double rho2=rho1/eta;
+	double rho3=(rho1-eta)/(1-eta);
+	double ret=0;
+	if(rho1<eta){
+		ret=eta*(exp(double(-beta*(1-rho2)))-(1-rho2)*exp(double(-beta)));
+	}
+	else{
+		ret=(1-eta)*(1-exp(double(-beta*rho3))+rho3*exp(double(eta)))+eta;
+	}
+
+	float proj=ret;
+	newsens1(epos[0], epos[1], epos[2]) = proj;
+
+	if(rho1<eta){
+		ret=beta*exp(-beta*(1-rho2))+exp(double(-beta));
+	}
+	else{
+		ret=beta*exp(double(-beta*rho3))+exp(double(-beta));
+	}
+
+	float projdiff=ret;
+	newsens(epos[0], epos[1], epos[2]) = projdiff;
+}
+
+void homo::robust_filter_proj(Tensor<float> sens, Tensor<float> rho, float radius /*= 2*/,float eta,float beta) {
+	Tensor<float> newsens(rho.getDim());//projdiff
+	newsens.reset(0);
+	Tensor<float> newsens1(rho.getDim());//proj
+	newsens1.reset(0);
+	radial_convker_t<float, Spline4> convker(radius, 0, true, false);
+	size_t grid_size, block_size;
+	make_kernel_param(&grid_size, &block_size, rho.size(), 256);
+	robust_filter_proj_kernel << <grid_size, block_size >> > (sens.view(), rho.view(), newsens.view(),newsens1.view(), convker,eta,beta);
+	cudaDeviceSynchronize();
+	cuda_error_check;
+	sens.copy(newsens);
+	rho.copy(newsens1);
+}
+
+
+template<typename Kernel>
+__global__ void robust_filter_kernel(
+	TensorView<float> sens, TensorView<float> rho, TensorView<float> newsens, Kernel wfunc,float scale) {
+	size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+	int ne = rho.size();
+	int reso[3] = { rho.size(0),rho.size(1),rho.size(2) };
+	if (tid >= ne) return;
+	int epos[3] = { tid % reso[0], tid / reso[0] % reso[1], tid / (reso[0] * reso[1]) };
+	float wsum = 0;
+	Kernel ker = wfunc;
+	float sum = 0;
+	for (int nei = 0; nei < wfunc.size(); nei++) {
+		int offset[3];
+		ker.neigh(nei, offset);
+		float w = ker.weight(offset);
+		int neighpos[3] = { epos[0] + offset[0], epos[1] + offset[1], epos[2] + offset[2] };
+		if (ker.is_period()) {
+			for (int i = 0; i < 3; i++) neighpos[i] = (neighpos[i] + reso[i]) % reso[i];
+		}
+		if (is_bounded(neighpos, reso)) {
+			//int neighid = neighpos[0] + (neighpos[1] + neighpos[2] * ereso[1]) * pitchT;
+			//w /= weightSum[neighid];
+			sum += sens(neighpos[0], neighpos[1], neighpos[2])* w;
+			wsum += w;
+		} 
+	}
+	//int eid = epos[0] + (epos[1] + epos[2] * ereso[1]) * pitchT;
+	sum /= wsum;
+	newsens(epos[0], epos[1], epos[2]) = sum*scale;
+}
+
+void homo::robust_filter(Tensor<float> sens, Tensor<float> rho, float radius /*= 2*/,float scale) {
+	Tensor<float> newsens(rho.getDim());
+	newsens.reset(0);
+	radial_convker_t<float, Spline4> convker(radius, 0, true, false);
+	size_t grid_size, block_size;
+	make_kernel_param(&grid_size, &block_size, rho.size(), 256);
+	robust_filter_kernel << <grid_size, block_size >> > (sens.view(), rho.view(), newsens.view(), convker,scale);
+	cudaDeviceSynchronize();
+	cuda_error_check;
+	sens.copy(newsens);
+}
+
