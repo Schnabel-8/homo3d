@@ -46,7 +46,7 @@ inline size_t Round(size_t n) {
 
 template<typename T, int N = 1>
 void writeVectors(const std::string& str, const std::vector<T> (&vecs)[N]){
-	std::ofstream ofs(str, std::ios::binary);
+	std::ofstream ofs(str, std::ios::binary|std::ios::out);
 	if (!ofs) {
 		printf("\033[31mopen file %s failed\033[0m\n", str.c_str());
 		return;

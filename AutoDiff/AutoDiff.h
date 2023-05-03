@@ -56,7 +56,6 @@ namespace homo {
 	template<typename opExp_t, typename Scalar> struct exp_exp_t;
 	template<typename opExp_t, typename Scalar> struct erd_exp_t;
 	template<typename opExp_t, typename Scalar> struct org_exp_t;
-	template<typename opExp_t, typename Scalar> struct tanh_exp_t;
 	template<typename opExp_t, typename Scalar> struct dlt_exp_t;
 	template<typename Scalar = double> struct scalar_exp_t;
 	template<typename subVar = void, typename Scalar = double> struct var_exp_t;
@@ -179,114 +178,78 @@ namespace homo {
 		__host_device_func Scalar erd_(Scalar rho, Scalar beta) {
 			if (std::is_same_v<Scalar, double>) {
 				double eta=0.7;
-				double rho2=rho/eta;
-				double rho3=(rho-eta)/(1-eta);
-				double ret=0;
-				if(rho<eta){
-					ret=eta*(exp(double(-beta*(1-rho2)))-(1-rho2)*exp(double(-beta)));
-				}
-				else{
-					ret=(1-eta)*(1-exp(double(-beta*rho3))+rho3*exp(double(eta)))+eta;
+				double tmp1=tanh(beta*eta);
+				double tmp2=tanh(beta*(rho-eta));
+				double tmp3=tanh(beta*(1-eta));
+				double ret=(tmp1+tmp2)/(tmp1+tmp3);
+				if(ret<0.01){
+					ret=0.01;
 				}
 				return ret;
-			
 			}
 			else {
 				float eta=0.7;
-				float rho2=rho/eta;
-				float rho3=(rho-eta)/(1-eta);
-				float ret=0;
-				if(rho<eta){
-					ret=eta*(expf((-beta*(1-rho2)))-(1-rho2)*expf((-beta)));
-				}
-				else{
-					ret=(1-eta)*(1-expf((-beta*rho3))+rho3*expf((eta)))+eta;
+				float tmp1=tanhf(beta*eta);
+				float tmp2=tanhf(beta*(rho-eta));
+				float tmp3=tanhf(beta*(1-eta));
+				float ret=(tmp1+tmp2)/(tmp1+tmp3);
+				if(ret<0.01){
+					ret=0.01;
 				}
 				return ret;
 			}
+			
 		}
 
 		template<typename Scalar>
 		__host_device_func Scalar org_(Scalar rho, Scalar beta) {
 			if (std::is_same_v<Scalar, double>) {
-				//double ret=1/(1+exp(double(-2*beta*(rho-0.5))));
-				double rho2=2*rho;
-				double ret=0;
-				if(rho<=0.5){
-					ret=(exp(double(-beta*(1-rho2)))-(1-rho2)*exp(double(-beta)))/2;
-				}
-				else{
-					ret=(1-exp(double(-beta*(rho2-1)))+(rho2-1)*exp(double(-beta)))/2+0.5;
+				double eta=0.5;
+				double tmp1=tanh(beta*eta);
+				double tmp2=tanh(beta*(rho-eta));
+				double tmp3=tanh(beta*(1-eta));
+				double ret=(tmp1+tmp2)/(tmp1+tmp3);
+				if(ret<0.01){
+					ret=0.01;
 				}
 				return ret;
-				//return pow(double(rho),double(3));
-			
 			}
 			else {
-				//float ret=1/(1+expf((-2*beta*(rho-0.5))));
-				float rho2=2*rho;
-				float ret=0;
-				if(rho<=0.5){
-					ret=(expf((-beta*(1-rho2)))-(1-rho2)*expf((-beta)))/2;
-				}
-				else{
-					ret=(1-expf((-beta*(rho2-1)))+(rho2-1)*expf((-beta)))/2+0.5;
+				float eta=0.5;
+				float tmp1=tanhf(beta*eta);
+				float tmp2=tanhf(beta*(rho-eta));
+				float tmp3=tanhf(beta*(1-eta));
+				float ret=(tmp1+tmp2)/(tmp1+tmp3);
+				if(ret<0.01){
+					ret=0.01;
 				}
 				return ret;
-				//return powf((rho),(3));
 			}
 		}
 
-		template<typename Scalar>
-		__host_device_func Scalar tanh_(Scalar rho, Scalar para) {
-			if (std::is_same_v<Scalar, double>) {
-				double beta=floor(para);
-				double eta=(para-beta)*10;
-				double tmp=beta*eta;
-				double tmp1=rho*beta;
-				double tmp2=(exp(2*tmp)-1)/(exp(2*tmp)+1);
-				double tmp3=(exp(2*(tmp1-tmp))-1)/(exp(2*(tmp1-tmp))+1);
-				double tmp4=(exp(2*(beta-tmp))-1)/(exp(2*(beta-tmp))+1);
-				return (tmp2+tmp3)/(tmp2+tmp4);
-			}
-			else {
-				float beta=floor(para);
-				float eta=(para-beta)*10;
-				float tmp=beta*eta;
-				float tmp1=rho*beta;
-				float tmp2=(expf(2*tmp)-1)/(expf(2*tmp)+1);
-				float tmp3=(expf(2*(tmp1-tmp))-1)/(expf(2*(tmp1-tmp))+1);
-				float tmp4=(expf(2*(beta-tmp))-1)/(expf(2*(beta-tmp))+1);
-				return (tmp2+tmp3)/(tmp2+tmp4);
-			}
-		}
+	
 
 		template<typename Scalar>
 		__host_device_func Scalar dlt_(Scalar rho, Scalar beta) {
 			if (std::is_same_v<Scalar, double>) {
-				double eta=0.3;
-				double rho2=rho/eta;
-				double rho3=(rho-eta)/(1-eta);
-				double ret=0;
-				if(rho<eta){
-					ret=eta*(exp(double(-beta*(1-rho2)))-(1-rho2)*exp(double(-beta)));
-				}
-				else{
-					ret=(1-eta)*(1-exp(double(-beta*rho3))+rho3*exp(double(eta)))+eta;
+				double eta=0.4;
+				double tmp1=tanh(beta*eta);
+				double tmp2=tanh(beta*(rho-eta));
+				double tmp3=tanh(beta*(1-eta));
+				double ret=(tmp1+tmp2)/(tmp1+tmp3);
+				if(ret<0.01){
+					ret=0.01;
 				}
 				return ret;
-			
 			}
 			else {
-				float eta=0.3;
-				float rho2=rho/eta;
-				float rho3=(rho-eta)/(1-eta);
-				float ret=0;
-				if(rho<eta){
-					ret=eta*(expf((-beta*(1-rho2)))-(1-rho2)*expf((-beta)));
-				}
-				else{
-					ret=(1-eta)*(1-expf((-beta*rho3))+rho3*expf((eta)))+eta;
+				float eta=0.4;
+				float tmp1=tanhf(beta*eta);
+				float tmp2=tanhf(beta*(rho-eta));
+				float tmp3=tanhf(beta*(1-eta));
+				float ret=(tmp1+tmp2)/(tmp1+tmp3);
+				if(ret<0.01){
+					ret=0.01;
 				}
 				return ret;
 			}
@@ -489,11 +452,6 @@ namespace homo {
 			return org_exp_t<subExp_t, T>(static_cast<subExp_t*>(this)->template refer<>(), T(s));
 		}
 
-		template<typename T2, std::enable_if_t<std::is_arithmetic_v<T2>, int> = 0 >
-		__host_device_func auto tanh(T2 s) {
-			using T = res_t<Scalar, T2>;
-			return tanh_exp_t<subExp_t, T>(static_cast<subExp_t*>(this)->template refer<>(), T(s));
-		}
 
 		template<typename T2, std::enable_if_t<std::is_arithmetic_v<T2>, int> = 0 >
 		__host_device_func auto dlt(T2 s) {
@@ -811,32 +769,16 @@ namespace homo {
 
 		__host_device_func Scalar eval_imp(void) {
 			Scalar rho=Base::op.eval();
-			Scalar eta=0.7;
-			Scalar rho2=rho/eta;
-			Scalar rho3=(rho-eta)/(1-eta);
-			Scalar ret=0;
-			if(rho<eta){
-				ret=eta*(exp(double(-beta*(1-rho2)))-(1-rho2)*exp(double(-beta)));
-			}
-			else{
-				ret=(1-eta)*(1-exp(double(-beta*rho3))+rho3*exp(double(eta)))+eta;
-			}
-			return ret;
-			
+			return erd_(rho,beta);
 		}
 
 		__host_device_func void backward_imp(Scalar lastdiff) {
 			Scalar rho=Base::value();
-			double eta=0.7;
-			double rho2=rho/eta;
-			double rho3=(rho-eta)/(1-eta);
-			double ret=0;
-			if(rho<eta){
-				ret=beta*exp(-beta*(1-rho2))+exp(double(-beta));
-			}
-			else{
-				ret=beta*exp(double(-beta*rho3))+exp(double(-beta));
-			}
+			Scalar eta=0.7;
+			Scalar tmp1=tanh(beta*eta);
+			Scalar tmp2=1/cosh(beta*(rho-eta));
+			Scalar tmp3=tanh(beta*(1-eta));
+			Scalar ret=beta*pow(double(tmp2),double(2))/(tmp1+tmp3);
 			Base::op.backward(lastdiff*ret);
 		}
 	};
@@ -854,71 +796,17 @@ namespace homo {
 
 		__host_device_func Scalar eval_imp(void) {
 			Scalar rho=Base::op.eval();
-			//Scalar ret=rho*rho*rho;
-			//Scalar ret=1/(1+exp(double(-2*beta*(rho-0.5))));
-			Scalar rho2=2*rho;
-			Scalar ret=0;
-			if(rho<=0.5){
-					ret=(exp(double(-beta*(1-rho2)))-(1-rho2)*exp(double(-beta)))/2;
-				}
-				else{
-					ret=(1-exp(double(-beta*(rho2-1)))+(rho2-1)*exp(double(-beta)))/2+0.5;
-				}
-			return ret;
-			
+			return org_(rho,beta);
 		}
 
 		__host_device_func void backward_imp(Scalar lastdiff) {
 			Scalar rho=Base::value();
-			//Scalar val=1/(1+exp(double(-2*beta*(rho-0.5))));
-			//Base::op.backward(lastdiff * (3*rho*rho));
-			Scalar rho2=2*rho;
-			Scalar ret=0;
-			if(rho<=0.5){
-					ret=beta*exp(double(-beta*(1-rho2)))+exp(double(-beta));
-				}
-				else{
-					ret=beta*exp(double(-beta*(rho2-1)))+exp(double(-beta));
-				}
-			Base::op.backward(lastdiff*(ret));
-			//Base::op.backward(lastdiff * (2*beta*exp(double(-2*beta*(rho-0.5)))*val*val));
-
-		}
-	};
-
-	// tanh function
-	template<typename opExp_t, typename Scalar>
-	struct tanh_exp_t
-		: public unary_exp_t<tanh_exp_t, opExp_t, Scalar>
-	{
-		using Base = unary_exp_t<tanh_exp_t, opExp_t, Scalar>;
-		Scalar beta =0;
-		Scalar eta=0.5;
-		__host_device_func tanh_exp_t(const opExp_t& op, Scalar para_=0.05)
-			: Base(op)
-		{beta=floor(para_);
-		eta=(para_-beta)*10;}
-
-		__host_device_func Scalar eval_imp(void) {
-			Scalar rho=Base::op.eval();
-			Scalar tmp=beta*eta;
-			Scalar tmp1=rho*beta;
-			Scalar tmp2=(exp(2*tmp)-1)/(exp(2*tmp)+1);
-			Scalar tmp3=(exp(2*(tmp1-tmp))-1)/(exp(2*(tmp1-tmp))+1);
-			Scalar tmp4=(exp(2*(beta-tmp))-1)/(exp(2*(beta-tmp))+1);
-			return (tmp2+tmp3)/(tmp2+tmp4);			
-		}
-
-		__host_device_func void backward_imp(Scalar lastdiff) {
-			Scalar rho=Base::value();
-			Scalar tmp=beta*eta;
-			Scalar tmp1=rho*beta;
-			Scalar tmp2=(exp(2*tmp)-1)/(exp(2*tmp)+1);
-			Scalar tmp3=(exp(2*(tmp1-tmp))-1)/(exp(2*(tmp1-tmp))+1);
-			Scalar tmp4=(exp(2*(beta-tmp))-1)/(exp(2*(beta-tmp))+1);
-			Scalar tmp5=exp(2*(tmp1-tmp))/((exp(2*(tmp1-tmp))+1)*(exp(2*(tmp1-tmp))+1));
-			Base::op.backward(lastdiff * (4*beta*tmp5/(tmp2+tmp4)));
-			
+			Scalar eta=0.5;
+			Scalar tmp1=tanh(beta*eta);
+			Scalar tmp2=1/cosh(beta*(rho-eta));
+			Scalar tmp3=tanh(beta*(1-eta));
+			Scalar ret=beta*pow(double(tmp2),double(2))/(tmp1+tmp3);
+			Base::op.backward(lastdiff*ret);
 		}
 	};
 
@@ -935,32 +823,16 @@ namespace homo {
 
 		__host_device_func Scalar eval_imp(void) {
 			Scalar rho=Base::op.eval();
-			Scalar eta=0.3;
-			Scalar rho2=rho/eta;
-			Scalar rho3=(rho-eta)/(1-eta);
-			Scalar ret=0;
-			if(rho<eta){
-				ret=eta*(exp(double(-beta*(1-rho2)))-(1-rho2)*exp(double(-beta)));
-			}
-			else{
-				ret=(1-eta)*(1-exp(double(-beta*rho3))+rho3*exp(double(eta)))+eta;
-			}
-			return ret;
-			
+			return dlt_(rho,beta);
 		}
 
 		__host_device_func void backward_imp(Scalar lastdiff) {
 			Scalar rho=Base::value();
-			double eta=0.3;
-			double rho2=rho/eta;
-			double rho3=(rho-eta)/(1-eta);
-			double ret=0;
-			if(rho<eta){
-				ret=beta*exp(-beta*(1-rho2))+exp(double(-beta));
-			}
-			else{
-				ret=beta*exp(double(-beta*rho3))+exp(double(-beta));
-			}
+			Scalar eta=0.4;
+			Scalar tmp1=tanh(beta*eta);
+			Scalar tmp2=1/cosh(beta*(rho-eta));
+			Scalar tmp3=tanh(beta*(1-eta));
+			Scalar ret=beta*pow(double(tmp2),double(2))/(tmp1+tmp3);
 			Base::op.backward(lastdiff*ret);
 		}
 	};

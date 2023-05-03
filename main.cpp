@@ -26,7 +26,7 @@ int main(int argc, char** argv)
 	config.parse(argc, argv);
 
     std::cout << "Hello World!\n";
-	cuda_test();
+	//cuda_test();
 	//testAutoDiff();
 	//testAutoDiff_cu();
 	//test_MMA();

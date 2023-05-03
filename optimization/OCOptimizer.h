@@ -16,13 +16,14 @@ namespace homo {
 		void filterSens(float* sens, const float* rho, size_t pitchT, int reso[3],float radius=2);
 		void filterSens(Tensor<float> sens, Tensor<float> rho, float radius = 2);
 		void update(const float* sens, float* rho, float volratio);
-		void update(Tensor<float> sens, Tensor<float>  rho, float volratio,float beta);
+		float update(Tensor<float> sens, Tensor<float>  rho, float volratio,float beta);
 		void update(Tensor<float> sens, Tensor<float>  rho, float volratio);
 	};
 
-	void robust_filter_proj(Tensor<float> sens, Tensor<float> rho, float radius /*= 2*/,float eta,float beta) ;
+	float robust_filter_proj(Tensor<float> sens, Tensor<float> rho, float radius /*= 2*/,float eta,float beta) ;
 	void robust_filter(Tensor<float> sens, Tensor<float> rho, float radius /*= 2*/,float scale);
-
+	float robust_result_filter(Tensor<float> rho, float radius /*= 2*/,float eta,float beta);
+	void mmadiff(Tensor<float> rho,Tensor<float> rho1,Tensor<float> rho2,Tensor<float> rho3,float val,float val1,float val2,float off);
 }
 
 

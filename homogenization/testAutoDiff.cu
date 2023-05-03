@@ -287,7 +287,7 @@ void optiBulk(cfg::HomoConfig config, var_tsexp_t<>& rho, Homogenization& hom, e
 	OCOptimizer oc(ne, 0.001, config.designStep, config.dampRatio);
 	// define objective expression
 	auto objective = -(Ch(0, 0) + Ch(1, 1) + Ch(2, 2) +
-		(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 3.; // bulk modulus
+		(Ch(0, 1) + Ch(0, 2) + Ch(1, 2)) * 2) / 9.; // bulk modulus
 	// record objective value
 	std::vector<double> objlist;
 	// convergence criteria
@@ -571,12 +571,7 @@ extern void runCustom(cfg::HomoConfig config);
 void runInstance(cfg::HomoConfig config) {
 	if (config.obj == cfg::Objective::custom) {
 		//optiCustom(config); return;
-		runCustom(config); 
-		return ;
-	}
-	else if(config.obj==cfg::Objective::npr){
-		optiNpr2(config);
-		return ;
+		runCustom(config); return;
 	}
 	// set output prefix
 	setPathPrefix(config.outprefix);

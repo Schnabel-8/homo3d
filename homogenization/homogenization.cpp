@@ -7,7 +7,7 @@
 extern void uploadTemplaceMatrix(const double* ke, float penal);
 void uploadTemplateLameMatrix(const char* kelam72, const char* kemu72, float Lam, float Mu);
 
-std::string outpath = "C:/Users/zhangdi/Documents/temp/homo/";
+std::string outpath = "./";
 
 namespace homo {
 	std::string getPath(const std::string& str) {
