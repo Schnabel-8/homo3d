@@ -47,7 +47,7 @@
 							\
 							{Tensor<float> rhoerd(config.reso[0], config.reso[1], config.reso[2]);\
 							rhoerd.copy(rho.value());\
-							float vol_ratio=robust_result_filter(rhoerd,config.filterRadius,0.7,16)/ne;\
+							float vol_ratio=robust_result_filter(rhoerd,config.filterRadius,0.6,16)/ne;\
 							js["erd_vol_ratio"]=vol_ratio;\
       						rhoerd.toVdb(getPath("rho_erode.vdb"));}\
 							\

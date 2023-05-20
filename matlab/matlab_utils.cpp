@@ -28,15 +28,15 @@ bool MatlabEngine::connect(const std::string &dir, bool closeAll)
 		}
     }
     else {
-        printf_s( "Starting MATLAB engine ... " );
-		//std::cout << "Starting MATLAB engine ... " << std::endl;
-        if (!(eng = engOpen("\0"))) {
+        //printf_s( "Starting MATLAB engine ... " );
+		std::cout << "Starting MATLAB engine ... " << std::endl;
+        if (!(eng = engOpen("matlab\0-nodesktop"))) {
             fprintf(stderr, "Failed!\n");
 			//std::cerr << "Failed!" << std::endl;
 			return false;
 		}
-        printf_s( "Succeed!\n");
-		//std::cout << "Succeed!" << std::endl;
+        //printf_s( "Succeed!\n");
+		std::cout << "Succeed!" << std::endl;
 	}
 
 	engBuffer[lenEngBuffer-1] = '\0';

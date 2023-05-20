@@ -32,6 +32,8 @@ namespace homo {
 		void setBound(float xmin, float xmax);
 
 		void update(int itn, float* x, float* dfdx, float* gval, float** dgdx);
+
+		void gcupdate(int itn,float f0, float* x, float* dfdx, float* gval, float** dgdx);
 	};
 
 }

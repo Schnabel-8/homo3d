@@ -115,9 +115,20 @@ file(GLOB cppfiles
         matlab/*.cpp
         optimization/*.cpp
     )
+
+    file(GLOB matlablib
+    /media/mezzrow/585b9bb8-4d7e-402b-9c83-1f14cdf6c416/matlab2023a/bin/glnxa64/libeng.so
+
+    /media/mezzrow/585b9bb8-4d7e-402b-9c83-1f14cdf6c416/matlab2023a/bin/glnxa64/libmx.so
+    
+    /media/mezzrow/585b9bb8-4d7e-402b-9c83-1f14cdf6c416/matlab2023a/extern/bin/glnxa64/libMatlabDataArray.so
+    
+    /media/mezzrow/585b9bb8-4d7e-402b-9c83-1f14cdf6c416/matlab2023a/extern/bin/glnxa64/libMatlabEngine.so
+    )
 # file(GLOB cppfiles *.cpp)
 add_executable(homo3d ${cppfiles})
 target_include_directories(homo3d PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+target_include_directories(homo3d PUBLIC /media/mezzrow/585b9bb8-4d7e-402b-9c83-1f14cdf6c416/matlab2023a/extern/include)
 target_link_libraries(homo3d PRIVATE cubin)
 #target_link_libraries(homo3d PRIVATE OpenVDB::openvdb)
 ##
@@ -125,6 +136,7 @@ target_link_libraries(homo3d PRIVATE /home/linuxbrew/.linuxbrew/Cellar/openvdb/1
 target_link_libraries(homo3d PRIVATE -lHalf)
 target_link_libraries(homo3d PRIVATE /home/linuxbrew/.linuxbrew/opt/tbb/lib/libtbb.so.12.8)
 target_link_libraries(homo3d PRIVATE nlohmann_json::nlohmann_json)
+target_link_libraries(homo3d PRIVATE ${matlablib})
 target_link_libraries(homo3d PRIVATE ${CUDA_LIBRARIES})
 target_link_libraries(homo3d PRIVATE ${CUDA_DRIVER_LIBRARY})
 target_link_libraries(homo3d PRIVATE ${CUDA_curand_LIBRARY})

@@ -570,7 +570,7 @@ mma_arg_pack subsolv_g(int nconstrain, int nvar, double epsimin,
 
 		int ittt = 0;
 
-		while (residumax > 0.9 * epsi && ittt < 200) {
+		while (residumax > 0.9 * epsi && ittt < 1000) {
 			ittt++;
 			itera++;
 			ux1 = upp - x;
@@ -1019,6 +1019,7 @@ gv::gVector<double> mmasub_ker(int nconstrain, int nvar,
 
 }
 
+
 void mmasub_g(int nconstrain, int nvar,
 	int itn, double* xvar, double* xmin, double* xmax, double* xold1, double* xold2,
 	double f0val, double* df0dx, double* gval, cudaPitchedPtr dgdx,
@@ -1121,6 +1122,195 @@ void mmasub_h(int nconstrain, int nvar,
 	upp_g.get(upp, nvar);
 }
 
+
+// return updated x, low_g and upp_g are updated in place
+gv::gVector<double> gcmmasub_ker(int nconstrain, int nvar,
+	int itn, gv::gVector<double>& xvar_g,
+	gv::gVector<double>& xmin_g, gv::gVector<double>& xmax_g,
+	gv::gVector<double>& xold1_g, gv::gVector<double>& xold2_g,
+	double f0val, gv::gVector<double>& df0dx_g, gv::gVector<double>& gval_g, gv::gVector<double>& dgdx_g,
+	gv::gVector<double>& low_g, gv::gVector<double>& upp_g,
+	double a0, gv::gVector<double>& a_g, gv::gVector<double>& c_g, gv::gVector<double>& d_g,
+	double move, int dgdxvarpitch
+) {
+	using gVector = gv::gVector<double>;
+
+	size_t nvarpitch = dgdxvarpitch;
+
+	double epsimin = 1e-7;
+	double raa0 = 1e-5;
+	double raa = 1e-5;
+	double albefa = 0.1;
+
+	auto zzz1 = low_g + albefa * (xvar_g - low_g);
+	auto zzz2 = xvar_g - move * (xmax_g - xmin_g);
+	auto zzz = zzz1.max(zzz2);
+	gVector alfa = zzz.max(xmin_g);
+	//alfa.toMatlab("alfa");
+
+	auto zzz11 = upp_g - albefa * (upp_g - xvar_g);
+	auto zzz22 = xvar_g + move * (xmax_g - xmin_g);
+	auto zzzz = zzz11.min(zzz22);
+	gVector beta = zzzz.min(xmax_g);
+	//beta.toMatlab("beta");
+
+	auto xmami = (xmax_g - xmin_g).max(1e-5);
+	auto xmamiinv = 1. / xmami;
+
+	gVector ux1 = upp_g - xvar_g;
+	gVector ux2 = ux1 * ux1;
+	gVector xl1 = xvar_g - low_g;
+	gVector xl2 = xl1 * xl1;
+	gVector uxinv = 1. / ux1;
+	gVector xlinv = 1. / xl1;
+
+	//auto p0 = df0dx_g.max(0);
+	//auto q0 = (-df0dx_g).max(0);
+	gVector pq0 =  (df0dx_g.max(0) + (-df0dx_g).max(0)) ;
+	gVector p0 = (df0dx_g.max(0) + 1e-3*pq0+raa0*xmamiinv) * ux2;
+	gVector q0 = ((-df0dx_g).max(0) + 1e-3*pq0+raa0*xmamiinv) * xl2;
+
+
+	gVector P = dgdx_g.max(0);
+	gVector Q = (-dgdx_g).max(0);
+
+#ifdef DEBUG_MMA_OPT
+	P.toMatlab("P");
+	Q.toMatlab("Q");
+#endif
+
+	// add PQ 
+	{
+		double* Pdata = P.data();
+		double* Qdata = Q.data();
+		double* ux2data = ux2.data();
+		double* xl2data = xl2.data();
+		int nwordpitch = nvarpitch / sizeof(double);
+		auto kernel = [=] __device__(int eid) {
+			for (int i = 0; i < nconstrain; i++) {
+				double p = Pdata[eid + i * nwordpitch];
+				double q = Qdata[eid + i * nwordpitch];
+				double pq=p+q;
+				p = p +  1e-3 * (pq) + raa * xmamiinv.eval(eid);
+				q = q +  1e-3 * (pq) + raa * xmamiinv.eval(eid);
+				Pdata[eid + i * nwordpitch] = (p) * ux2data[eid];
+				Qdata[eid + i * nwordpitch] = (q) * xl2data[eid];
+			}
+		};
+		parallel_do(nvar, 512, kernel);
+	}
+
+#ifdef DEBUG_MMA_OPT
+	uxinv.toMatlab("uxinv");
+	xlinv.toMatlab("xlinv");
+	P.toMatlab("P");
+	Q.toMatlab("Q");
+#endif
+
+	gVector bmat(P);
+	gVector b(nconstrain);
+	int wordpitch;
+	{
+		double* bmat_data = bmat.data();
+		double* Pbdata = P.data();
+		double* Qbdata = Q.data();
+		double* uxinv_data = uxinv.data();
+		double* xlinv_data = xlinv.data();
+		wordpitch = nvarpitch / sizeof(double);
+		auto kernel = [=] __device__(int eid) {
+			for (int i = 0; i < nconstrain; i++) {
+				bmat_data[eid + i * wordpitch] = Pbdata[eid + i * wordpitch] * uxinv_data[eid] + Qbdata[eid + i * wordpitch] * xlinv_data[eid];
+			}
+		};
+		parallel_do(nvar, 512, kernel);
+		bmat.pitchSumInPlace(4, nvar, nvarpitch / sizeof(double));
+		double* bdata = b.data();
+		double* gval_data = gval_g.data();
+		auto kernel_gather = [=] __device__(int eid) {
+			bdata[eid] = bmat_data[eid * wordpitch] - gval_data[eid];
+		};
+		parallel_do(nconstrain, 512, kernel_gather);
+	}
+
+#ifdef DEBUG_MMA_OPT
+	b.toMatlab("b");
+	p0.toMatlab("p0");
+	q0.toMatlab("q0");
+	a_g.toMatlab("a");
+	c_g.toMatlab("c");
+	d_g.toMatlab("d");
+#endif
+	
+	//return std::make_tuple(
+	//	std::move(x), std::move(y), std::move(z),
+	//	std::move(lam), std::move(xsi), std::move(eta),
+	//	std::move(mu), std::move(zet), std::move(s));
+
+	auto[x, y, z, lam, xsi, eta, mu, zet, s] = subsolv_g(
+		nconstrain, nvar, epsimin,
+		low_g, upp_g,
+		alfa, beta,
+		p0, q0,
+		P, Q,
+		wordpitch, wordpitch,
+		a0, a_g, b, c_g, d_g);
+
+#ifdef DEBUG_MMA_OPT
+	x.toMatlab("xnew");
+	y.toMatlab("ynew");
+	lam.toMatlab("lamnew");
+	xsi.toMatlab("xsinew");
+	eta.toMatlab("etanew");
+	mu.toMatlab("munew");
+	s.toMatlab("snew");
+#endif
+	
+	return x;
+
+}
+
+void gcmmasub_g(int nconstrain, int nvar,
+	int itn, double* xvar, double* xmin, double* xmax, double* xold1, double* xold2,
+	double f0val, double* df0dx, double* gval, cudaPitchedPtr dgdx,
+	double* low, double* upp,
+	double a0, double* a, double* c, double* d,
+	double move
+) {
+	gv::gVector<double>::Init();
+
+	typedef gv::gVector<double> gVector;
+	typedef gv::gVectorMap<double> gVectorMap;
+
+	gVectorMap xvar_g(xvar, nvar);
+
+	gVectorMap xmin_g(xmin, nvar), xmax_g(xmax, nvar);
+
+	gVectorMap xold1_g(xold1, nvar), xold2_g(xold2, nvar);
+
+	gVectorMap df0dx_g(df0dx, nvar);
+
+	gVectorMap gval_g(gval, nconstrain);
+
+	gVectorMap dgdx_g((double*)dgdx.ptr, dgdx.pitch / sizeof(double) * nconstrain);
+	
+	gVectorMap low_g(low, nvar), upp_g(upp, nvar);
+
+	gVectorMap a_g(a, nconstrain), c_g(c, nconstrain), d_g(d, nconstrain);
+
+	auto x = gcmmasub_ker(nconstrain, nvar, itn,
+		xvar_g, xmin_g, xmax_g, xold1_g, xold2_g,
+		f0val, df0dx_g, gval_g, dgdx_g,
+		low_g, upp_g, a0, a_g, c_g, d_g,
+		move, dgdx.pitch);
+
+	cudaMemcpy(xold2, xold1, sizeof(double) * nvar, cudaMemcpyDeviceToDevice);
+	cudaMemcpy(xold1, xvar, sizeof(double) * nvar, cudaMemcpyDeviceToDevice);
+	cudaMemcpy(xvar, x.data(), x.size() * sizeof(double), cudaMemcpyDeviceToDevice);
+	
+	// low upp are already mapped
+	//low_g.get(low, nvar);
+	//upp_g.get(upp, nvar);
+}
 
 
 

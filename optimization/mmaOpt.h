@@ -19,4 +19,8 @@ API_MMAOPT void mmasubDevice(int ncontrain, int nvar, int itn, double* xvar, dou
 	double f0val, double* df0dx, double* gval, cudaPitchedPtr dgdx, double* low, double* upp,
 	double a0, double* a, double* c, double* d, double move);
 
+
+API_MMAOPT void gcmmasubDevice(int ncontrain, int nvar, int itn, double* xvar, double* xmin, double* xmax, double* xold1, double* xold2,
+	double f0val, double* df0dx, double* gval, cudaPitchedPtr dgdx, double* low, double* upp,
+	double a0, double* a, double* c, double* d, double move);
 #endif

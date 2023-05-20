@@ -345,9 +345,10 @@ __global__ void robust_filter_proj_kernel(
 	double tmp2=tanh(beta*(rho1-eta));
 	double tmp3=tanh(beta*(1-eta));
 	double ret=(tmp1+tmp2)/(tmp1+tmp3);
-	if(ret<0.01){
+	if(ret<0.0001){
 		ret=0.0001;
 	}
+	//double ret=1-exp(-beta*rho1)+rho1*exp(-beta);
 	float proj=ret;
 	newsens1(epos[0], epos[1], epos[2]) = proj;
 
@@ -355,6 +356,7 @@ __global__ void robust_filter_proj_kernel(
 	tmp2=1/cosh(beta*(rho1-eta));
 	tmp3=tanh(beta*(1-eta));
 	ret=beta*pow(double(tmp2),double(2))/(tmp1+tmp3);
+	//ret=beta*exp(-beta*rho1)+exp(-beta);
 
 	float projdiff=ret;
 	newsens(epos[0], epos[1], epos[2]) = projdiff;

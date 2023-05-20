@@ -147,6 +147,10 @@ namespace homo {
 		const Scalar* data(void) {
 			return &C_[0][0];
 		}
+
+		Scalar pr(void){
+			return C_[0][1]/(C_[0][1]+C_[0][0]);
+		}
 	};
 
 	//struct HomoTraits {

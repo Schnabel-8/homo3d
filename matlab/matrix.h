@@ -1,7 +1,9 @@
-/*
- * External header for the libmx library.
+/**
+ * @file extern/include/matrix.h
  *
- * Copyright 1984-2018 The MathWorks, Inc.
+ * @brief External header for the libmx library.
+ *
+ * @copyright 1984-2022 The MathWorks, Inc.
  * All Rights Reserved.
  */
 
@@ -54,6 +56,7 @@
 #define R2021a 800
 #define R2021b 800
 #define R2022a 800
+#define R2022b 800
 #define MW_LATEST_API_VERSION 800
 
 

@@ -79,6 +79,23 @@ namespace homo {
 		type_cast(x, context->xvar.data(), n);
 	}
 
+	void MMAOptimizer::gcupdate(int itn,float f0, float* x, float* dfdx, float* gval, float** dgdx)
+	{
+		type_cast(context->xvar.data(), x, n);
+		type_cast(context->df0dx.data(), dfdx, n);
+		for (int i = 0; i < m; i++) {
+			type_cast(context->dgdx.data() + i * (context->gpitch / sizeof(double)), dgdx[i], n);
+		}
+		type_cast(context->gval.data(), gval, m);
+		double f0val = f0; // doesn't matter
+		double move = 0.5;
+		// optimize
+		cudaPitchedPtr dgdxptr{ (void*)context->dgdx.data(), context->gpitch, n * sizeof(double), m };
+		gcmmasubDevice(m, n, itn, context->xvar.data(), context->xmin.data(), context->xmax.data(), context->xold1.data(), context->xold2.data(),
+			f0val, context->df0dx.data(), context->gval.data(), dgdxptr, context->low.data(), context->upp.data(),
+			a0, context->acd.data(), context->acd.data() + m, context->acd.data() + 2 * m, move);
+		type_cast(x, context->xvar.data(), n);
+	}
 
 }
 

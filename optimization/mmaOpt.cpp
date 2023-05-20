@@ -20,6 +20,11 @@ extern void mmasub_g(int ncontrain, int nvar,
 	double f0val, double* df0dx, double* gval, cudaPitchedPtr dgdx,
 	double* low, double* upp,
 	double a0, double* a, double* c, double* d,double move);
+extern void gcmmasub_g(int ncontrain, int nvar,
+	int itn, double* xvar, double* xmin, double* xmax, double* xold1, double* xold2,
+	double f0val, double* df0dx, double* gval, cudaPitchedPtr dgdx,
+	double* low, double* upp,
+	double a0, double* a, double* c, double* d,double move);
 
 extern void solveLinearHost(int nconstrain, const double* Alamhost, const double* ahost, double zet, double z, const double* bb, double* xhost);
 extern void test_gVector(void);
@@ -43,6 +48,16 @@ API_MMAOPT void mmasubDevice(
 	double a0, double* a, double* c, double* d, double move
 ) {
 	mmasub_g(ncontrain, nvar, itn, xvar, xmin, xmax, xold1, xold2, f0val, df0dx, gval, dgdx, low, upp, a0, a, c, d, move);
+}
+
+API_MMAOPT void gcmmasubDevice(
+	int ncontrain, int nvar,
+	int itn, double* xvar, double* xmin, double* xmax, double* xold1, double* xold2,
+	double f0val, double* df0dx, double* gval, cudaPitchedPtr dgdx, 
+	double* low, double* upp,
+	double a0, double* a, double* c, double* d, double move
+) {
+	gcmmasub_g(ncontrain, nvar, itn, xvar, xmin, xmax, xold1, xold2, f0val, df0dx, gval, dgdx, low, upp, a0, a, c, d, move);
 }
 
 void solveLinearHost(int nconstrain, const double* Alamhost, const double* ahost, double zet, double z, const double* bb, double* xhost) {

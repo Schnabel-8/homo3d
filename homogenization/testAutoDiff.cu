@@ -415,7 +415,7 @@ void optiNpr(cfg::HomoConfig config, var_tsexp_t<>& rho, Homogenization& hom, el
 		// compute derivative
 		objective.backward(1);
 		// output to screen
-		printf("\033[32m\n * Iter %d   obj = %.4e\033[0m\n", iter, val);
+		printf("\033[32m\n * Iter %d   obj = %.4e\033[0m    pr = %.4e\033[0m\n", iter, val,Ch.pr());
 		// check convergence
 		if (criteria.is_converge(iter, val)) { printf("= converged\n"); break; }
 		// make sensitivity symmetry
@@ -437,7 +437,7 @@ void optiNpr(cfg::HomoConfig config, var_tsexp_t<>& rho, Homogenization& hom, el
 	//rhop.value().toMatlab("rhofinal");
 	hom.grid->writeDensity(getPath("density"), VoxelIOFormat::openVDB);
 	hom.grid->array2matlab("objlist", objlist.data(), objlist.size());
-	rho.value().toVdb(getPath("rho"));
+	rho.value().toVdb(getPath("rhonpr.vdb"));
 	Ch.writeTo(getPath("C"));
 }
 

@@ -14,7 +14,7 @@
 //#define MATLAB_DEFAULT_RELEASE R2017b
 //#define MATLAB_DEFAULT_RELEASE R2018a
 
-#define MATLAB_DEFAULT_RELEASE R2020a
+#define MATLAB_DEFAULT_RELEASE R2023a
 
 inline void ensure(bool cond, const char *msg, ...)
 {   if (!cond) { va_list args; va_start(args, msg); vfprintf(stderr, (msg+std::string("\n")).c_str(), args); va_end(args); } }
