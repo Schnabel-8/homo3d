@@ -39,23 +39,9 @@
 					// o.seekp(0,std::ios::beg);\
 					// o<<std::setw(4)<<js<<std::endl
 
-#define JSON_ROBUST_RESULT	{Tensor<float> rhoorg(config.reso[0], config.reso[1], config.reso[2]);\
-							rhoorg.copy(rho.value());\
-							float vol_ratio=robust_result_filter(rhoorg,config.filterRadius,0.5,16)/ne;\
-							js["org_vol_ratio"]=vol_ratio;\
-      						rhoorg.toVdb(getPath("rho_origin.vdb"));}\
-							\
-							{Tensor<float> rhoerd(config.reso[0], config.reso[1], config.reso[2]);\
-							rhoerd.copy(rho.value());\
-							float vol_ratio=robust_result_filter(rhoerd,config.filterRadius,0.6,16)/ne;\
-							js["erd_vol_ratio"]=vol_ratio;\
-      						rhoerd.toVdb(getPath("rho_erode.vdb"));}\
-							\
-							{Tensor<float> rhodlt(config.reso[0], config.reso[1], config.reso[2]);\
-							rhodlt.copy(rho.value());\
-							float vol_ratio=robust_result_filter(rhodlt,config.filterRadius,0.4,16)/ne;\
-							js["dlt_vol_ratio"]=vol_ratio;\
-      						rhodlt.toVdb(getPath("rho_dilate.vdb"));}\
+#define JSON_ROBUST_RESULT	robust_result(config,rho.value(),0);\
+							robust_result(config,rho.value(),1);\
+							robust_result(config,rho.value(),2);\
 							o.seekp(0,std::ios::beg);\
 							o<<std::setw(4)<<js<<std::endl
 
@@ -88,4 +74,38 @@ time_eq = (t2.tv_sec - t1.tv_sec) + (double)(t2.tv_usec - t1.tv_usec)/1000000.0
 #define ROBUST_TIME3 \
 gettimeofday(&t3,NULL);\
 time_mma = (t3.tv_sec - t2.tv_sec) + (double)(t3.tv_usec - t2.tv_usec)/1000000.0
+
+
+void robust_result(cfg::HomoConfig config,Tensor<float> rhoold,int mode){
+	enum ResultMode{Origin=0,Erode,Dilate};
+	Tensor<float> zeros(config.reso[0], config.reso[1], config.reso[2]);
+	TensorVar<float> rho(config.reso[0], config.reso[1], config.reso[2]);
+	rho.value().copy(rhoold);
+	int ne = config.reso[0] * config.reso[1] * config.reso[2];
+	float val=0;
+	float beta=16;
+	if(mode==Origin){
+		auto proj_rho=rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).org(beta);
+		proj_rho.eval();
+		float vol_ratio=proj_rho.value().sum()/ne;
+		printf("origin vol_ratio:   %.4e\033[0m   val:   %.4e\033[0m\n",vol_ratio,val);
+        proj_rho.value().toVdb(getPath("rho_origin.vdb"));
+	}
+	if(mode==Erode){
+		auto proj_rho=rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).erd(beta);
+		proj_rho.eval();
+		float vol_ratio=proj_rho.value().sum()/ne;
+		printf("erode vol_ratio:   %.4e\033[0m\n",vol_ratio);
+        proj_rho.value().toVdb(getPath("rho_erode.vdb"));
+	}
+
+	if(mode==Dilate){
+		auto proj_rho=rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).dlt(beta);
+		proj_rho.eval();
+		float vol_ratio=proj_rho.value().sum()/ne;
+		printf("dilate vol_ratio:   %.4e\033[0m		val:   %.4e\033[0m\n",vol_ratio,val);
+        proj_rho.value().toVdb(getPath("rho_dilate.vdb"));
+	}		
+}
+
 #endif

@@ -570,7 +570,7 @@ mma_arg_pack subsolv_g(int nconstrain, int nvar, double epsimin,
 
 		int ittt = 0;
 
-		while (residumax > 0.9 * epsi && ittt < 1000) {
+		while (residumax > 0.9 * epsi && ittt < 100) {
 			ittt++;
 			itera++;
 			ux1 = upp - x;
@@ -845,7 +845,7 @@ gv::gVector<double> mmasub_ker(int nconstrain, int nvar,
 	size_t nvarpitch = dgdxvarpitch;
 
 	//double epsimin = 1e-7;
-	double epsimin = 1e-7;
+	double epsimin = 1e-8*sqrt(nconstrain*nvar);
 	double raa0 = 1e-5;
 	double albefa = 0.1;
 	double asyinit = 0.5;

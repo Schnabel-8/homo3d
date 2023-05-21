@@ -177,7 +177,7 @@ namespace homo {
 		template<typename Scalar>
 		__host_device_func Scalar erd_(Scalar rho, Scalar beta) {
 			if (std::is_same_v<Scalar, double>) {
-				double eta=0.6;
+				double eta=0.7;
 				double tmp1=tanh(beta*eta);
 				double tmp2=tanh(beta*(rho-eta));
 				double tmp3=tanh(beta*(1-eta));
@@ -188,7 +188,7 @@ namespace homo {
 				return ret;
 			}
 			else {
-				float eta=0.6;
+				float eta=0.7;
 				float tmp1=tanhf(beta*eta);
 				float tmp2=tanhf(beta*(rho-eta));
 				float tmp3=tanhf(beta*(1-eta));
@@ -776,8 +776,8 @@ namespace homo {
 		}
 
 		__host_device_func void backward_imp(Scalar lastdiff) {
-			Scalar rho=Base::value();
-			Scalar eta=0.6;
+			Scalar rho=Base::op.value();
+			Scalar eta=0.7;
 			Scalar tmp1=tanh(beta*eta);
 			Scalar tmp2=1/cosh(beta*(rho-eta));
 			Scalar tmp3=tanh(beta*(1-eta));
@@ -792,8 +792,8 @@ namespace homo {
 		: public unary_exp_t<org_exp_t, opExp_t, Scalar>
 	{
 		using Base = unary_exp_t<org_exp_t, opExp_t, Scalar>;
-		Scalar beta =0.01;
-		__host_device_func org_exp_t(const opExp_t& op, Scalar beta_=0.01)
+		Scalar beta ;
+		__host_device_func org_exp_t(const opExp_t& op, Scalar beta_)
 			: Base(op), beta(beta_)
 		{ }
 
@@ -803,7 +803,7 @@ namespace homo {
 		}
 
 		__host_device_func void backward_imp(Scalar lastdiff) {
-			Scalar rho=Base::value();
+			Scalar rho=Base::op.value();
 			Scalar eta=0.5;
 			Scalar tmp1=tanh(beta*eta);
 			Scalar tmp2=1/cosh(beta*(rho-eta));
@@ -831,7 +831,7 @@ namespace homo {
 		}
 
 		__host_device_func void backward_imp(Scalar lastdiff) {
-			Scalar rho=Base::value();
+			Scalar rho=Base::op.value();
 			Scalar eta=0.4;
 			Scalar tmp1=tanh(beta*eta);
 			Scalar tmp2=1/cosh(beta*(rho-eta));
