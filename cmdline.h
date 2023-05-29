@@ -30,7 +30,7 @@ DECLARE_double(relthres);
 #define b2s(boolValue) (boolValue?"Yes":"No")
 
 namespace cfg {
-	enum class Objective : uint8_t { bulk, shear, npr, custom };
+	enum class Objective : uint8_t { bulk, shear, npr, custom ,rbulk,rshear,rnpr,test};
 	enum class Symmetry : uint8_t { reflect3, reflect6, rotate3, NONE };
 	enum class InitWay : uint8_t { random, randcenter, noise, manual, interp, rep_randcenter, P, G, D, IWP };
 

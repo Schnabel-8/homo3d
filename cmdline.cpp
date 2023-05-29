@@ -50,6 +50,18 @@ void cfg::HomoConfig::parse(int argc, char** argv)
 	else if (FLAGS_obj == "custom") {
 		obj = Objective::custom;
 	}
+	else if (FLAGS_obj == "rbulk") {
+		obj = Objective::rbulk;
+	}
+	else if (FLAGS_obj == "rnpr") {
+		obj = Objective::rnpr;
+	}
+	else if (FLAGS_obj == "rshear") {
+		obj = Objective::rshear;
+	}
+	else if (FLAGS_obj == "test") {
+		obj = Objective::test;
+	}
 	else {
 		printf("\033[31munrecognized Objective type %s\033[0m\n", FLAGS_obj.c_str());
 		exit(-1);

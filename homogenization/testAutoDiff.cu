@@ -569,7 +569,7 @@ void optiCustom(cfg::HomoConfig config) {
 extern void runCustom(cfg::HomoConfig config);
 
 void runInstance(cfg::HomoConfig config) {
-	if (config.obj == cfg::Objective::custom) {
+	if (config.obj >= cfg::Objective::custom) {
 		//optiCustom(config); return;
 		runCustom(config); return;
 	}

@@ -131,7 +131,7 @@ void example_opti_npr(cfg::HomoConfig config) {
 	ConvergeChecker criteria(config.finthres);
 	// main loop of optimization
 	for (int iter = 0; iter < config.max_iter&&!quit_flag; iter++) {
-		if(((iter%50)==0)&&(beta<16)){
+		if(((iter%50)==0)&&(beta<32)){
 			beta*=2;
 			rhop = rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).org(beta).pow(3);
 		}
@@ -139,8 +139,8 @@ void example_opti_npr(cfg::HomoConfig config) {
 		elastic_tensor_t<float, decltype(rhop)> Ch(hom, rhop);
 		AbortErr();
 		float beta1=0.6;
-		auto objective = ((Ch(0, 1) + Ch(0, 2) + Ch(1, 2))
-			/ (Ch(0, 0) + Ch(1, 1) + Ch(2, 2)) * beta1 + 1).log() - (Ch(0, 0) + Ch(1, 1) + Ch(2, 2)).pow(0.5f) * 1e-3f;
+		auto objective = 1000*(((Ch(0, 1) + Ch(0, 2) + Ch(1, 2))
+			/ (Ch(0, 0) + Ch(1, 1) + Ch(2, 2)) * beta1 + 1).log() - (Ch(0, 0) + Ch(1, 1) + Ch(2, 2)).pow(0.5f) * 1e-3f);
 
 
 		// abort when cuda error occurs

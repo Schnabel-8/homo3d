@@ -42,9 +42,20 @@
 #define JSON_ROBUST_RESULT	robust_result(config,rho.value(),0);\
 							robust_result(config,rho.value(),1);\
 							robust_result(config,rho.value(),2);\
+							auto dlt_rho=rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).dlt(beta);\
+            				dlt_rho.eval();\
+							float dlt_vol=dlt_rho.value().sum()/ne;\
+							js["vol_dlt"]=dlt_vol;\
+							auto org_rho=rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).org(beta);\
+            				org_rho.eval();\
+							float org_vol=org_rho.value().sum()/ne;\
+							js["vol_org"]=org_vol;\
+							auto erd_rho=rho.conv(radial_convker_t<float, Spline4>(config.filterRadius)).erd(beta);\
+            				erd_rho.eval();\
+							float erd_vol=erd_rho.value().sum()/ne;\
+							js["vol_erd"]=erd_vol;\
 							o.seekp(0,std::ios::beg);\
 							o<<std::setw(4)<<js<<std::endl
-
 
 // sig_handler: type ctrl-\ to quit the running process and save current results
 // remember to involve quit_flag in the loop condition

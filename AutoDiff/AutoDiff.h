@@ -38,7 +38,11 @@ void data2matrix_h(const std::string& mtname, float* pdata, int m, int n = 1, in
 void data2matrix_h(const std::string& mtname, double* pdata, int m, int n = 1, int pitch = -1);
 #endif
 
+
 namespace homo {
+
+#define ROBUST_erd_eta 0.8
+#define ROBUST_dlt_eta 0.2
 
 #ifdef __CUDACC__
 	namespace homostd = cuda::std;
@@ -177,24 +181,24 @@ namespace homo {
 		template<typename Scalar>
 		__host_device_func Scalar erd_(Scalar rho, Scalar beta) {
 			if (std::is_same_v<Scalar, double>) {
-				double eta=0.7;
+				double eta=ROBUST_erd_eta;
 				double tmp1=tanh(beta*eta);
 				double tmp2=tanh(beta*(rho-eta));
 				double tmp3=tanh(beta*(1-eta));
 				double ret=(tmp1+tmp2)/(tmp1+tmp3);
-				if(ret<0.01){
-					ret=0.01;
+				if(ret<1e-5){
+					ret=1e-5;
 				}
 				return ret;
 			}
 			else {
-				float eta=0.7;
+				float eta=ROBUST_erd_eta;
 				float tmp1=tanhf(beta*eta);
 				float tmp2=tanhf(beta*(rho-eta));
 				float tmp3=tanhf(beta*(1-eta));
 				float ret=(tmp1+tmp2)/(tmp1+tmp3);
-				if(ret<0.01){
-					ret=0.01;
+				if(ret<1e-5){
+					ret=1e-5;
 				}
 				return ret;
 			}
@@ -209,8 +213,8 @@ namespace homo {
 				double tmp2=tanh(beta*(rho-eta));
 				double tmp3=tanh(beta*(1-eta));
 				double ret=(tmp1+tmp2)/(tmp1+tmp3);
-				if(ret<0.0001){
-					ret=0.0001;
+				if(ret<1e-5){
+					ret=1e-5;
 				}
 				//double ret=1-exp(-beta*rho)+rho*exp(-beta);
 				return ret;
@@ -221,8 +225,8 @@ namespace homo {
 				float tmp2=tanhf(beta*(rho-eta));
 				float tmp3=tanhf(beta*(1-eta));
 				float ret=(tmp1+tmp2)/(tmp1+tmp3);
-				if(ret<0.0001){
-					ret=0.0001;
+				if(ret<1e-5){
+					ret=1e-5;
 				}
 
 				//float ret=1-expf(-beta*rho)+rho*expf(-beta);
@@ -235,24 +239,24 @@ namespace homo {
 		template<typename Scalar>
 		__host_device_func Scalar dlt_(Scalar rho, Scalar beta) {
 			if (std::is_same_v<Scalar, double>) {
-				double eta=0.4;
+				double eta=ROBUST_dlt_eta;
 				double tmp1=tanh(beta*eta);
 				double tmp2=tanh(beta*(rho-eta));
 				double tmp3=tanh(beta*(1-eta));
 				double ret=(tmp1+tmp2)/(tmp1+tmp3);
-				if(ret<0.01){
-					ret=0.01;
+				if(ret<1e-5){
+					ret=1e-5;
 				}
 				return ret;
 			}
 			else {
-				float eta=0.4;
+				float eta=ROBUST_dlt_eta;
 				float tmp1=tanhf(beta*eta);
 				float tmp2=tanhf(beta*(rho-eta));
 				float tmp3=tanhf(beta*(1-eta));
 				float ret=(tmp1+tmp2)/(tmp1+tmp3);
-				if(ret<0.01){
-					ret=0.01;
+				if(ret<1e-5){
+					ret=1e-5;
 				}
 				return ret;
 			}
@@ -777,7 +781,7 @@ namespace homo {
 
 		__host_device_func void backward_imp(Scalar lastdiff) {
 			Scalar rho=Base::op.value();
-			Scalar eta=0.7;
+			Scalar eta=ROBUST_erd_eta;
 			Scalar tmp1=tanh(beta*eta);
 			Scalar tmp2=1/cosh(beta*(rho-eta));
 			Scalar tmp3=tanh(beta*(1-eta));
@@ -832,7 +836,7 @@ namespace homo {
 
 		__host_device_func void backward_imp(Scalar lastdiff) {
 			Scalar rho=Base::op.value();
-			Scalar eta=0.4;
+			Scalar eta=ROBUST_dlt_eta;
 			Scalar tmp1=tanh(beta*eta);
 			Scalar tmp2=1/cosh(beta*(rho-eta));
 			Scalar tmp3=tanh(beta*(1-eta));
